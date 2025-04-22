@@ -122,7 +122,7 @@ def generate_sample_prompt():
                 {"role": "system", "content": "You are an AI assistant generating decision-making scenarios."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.9,  # Higher temperature for diversity
+            temperature=0.9,
             max_tokens=1500,
             response_format={"type": "json_object"}
         )
@@ -194,7 +194,7 @@ if st.session_state.step == 1:
                         st.session_state.dilemma = dilemma
                         st.session_state.process_hint = process_hint
                         st.session_state.scenarios = scenarios
-                        st.session_state.extracted = extract_info(dilemma, process_hint)
+                        st.session_state.extracted = extract_info(dilemma, process_hint, scenarios)
                     st.session_state.step = 2
                     st.success("Decision structure extracted successfully!")
                     st.rerun()
@@ -204,14 +204,14 @@ if st.session_state.step == 1:
 # Step 2: Review and Edit Decision Structure
 elif st.session_state.step == 2:
     st.header("Step 2: Review and Edit Decision Structure")
-    st.info("Review the AI-extracted decision type, stakeholders, issues, and process steps. Edit as needed before generating personas.")
+    st.info("Review the AI-extracted decision type, stakeholders, issues, process steps, and external factors. Edit as needed before generating personas.")
     if st.session_state.extracted:
         with st.form("edit_extraction_form"):
             st.markdown("### Decision Type")
             decision_type = st.selectbox(
                 "Decision Type",
                 options=DECISION_TYPES,
-                index=DECISION_TYPES.index(st.session_state.extracted.get("decision_type", "Other"))
+                index=DECISION_TYPES.index(st.session_state.extracted.get("decision_type", "Other").split(" (")[0])
             )
             st.markdown("### Stakeholders (Editable Cards)")
             st.markdown("""
@@ -223,7 +223,7 @@ elif st.session_state.step == 2:
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 margin-bottom: 15px;
             }
-            .stakeholder-card input {
+            .stakeholder-card input, .stakeholder-card textarea {
                 width: 100%;
                 margin-bottom: 10px;
             }
@@ -235,29 +235,35 @@ elif st.session_state.step == 2:
                 with cols[i % 4]:
                     st.markdown(f'<div class="stakeholder-card">', unsafe_allow_html=True)
                     name = st.text_input(f"Name", value=s.get("name", ""), key=f"stakeholder_name_{i}")
-                    traits = st.text_input(
+                    role = st.text_input(f"Role", value=s.get("role", ""), key=f"stakeholder_role_{i}")
+                    traits = st.text_area(
                         f"Psychological Traits (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['psychological_traits'])})",
                         value=s.get("psychological_traits", ""),
-                        key=f"stakeholder_traits_{i}"
+                        key=f"stakeholder_traits_{i}",
+                        height=50
                     )
-                    influences = st.text_input(
+                    influences = st.text_area(
                         f"Influences (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['influences'])})",
                         value=s.get("influences", ""),
-                        key=f"stakeholder_influences_{i}"
+                        key=f"stakeholder_influences_{i}",
+                        height=50
                     )
-                    biases = st.text_input(
+                    biases = st.text_area(
                         f"Biases (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['biases'])})",
                         value=s.get("biases", ""),
-                        key=f"stakeholder_biases_{i}"
+                        key=f"stakeholder_biases_{i}",
+                        height=50
                     )
-                    history = st.text_input(
+                    history = st.text_area(
                         f"Historical Behavior (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['historical_behavior'])})",
                         value=s.get("historical_behavior", ""),
-                        key=f"stakeholder_history_{i}"
+                        key=f"stakeholder_history_{i}",
+                        height=50
                     )
                     st.markdown('</div>', unsafe_allow_html=True)
                     stakeholders.append({
                         "name": name,
+                        "role": role,
                         "psychological_traits": traits,
                         "influences": influences,
                         "biases": biases,
@@ -275,6 +281,12 @@ elif st.session_state.step == 2:
                 value="\n".join(st.session_state.extracted.get("process", [])),
                 height=100
             )
+            st.markdown("### External Factors")
+            external_factors = st.text_area(
+                "External Factors (one per line)",
+                value="\n".join(st.session_state.extracted.get("external_factors", [])),
+                height=100
+            )
             st.markdown("### ASCII Process Timeline")
             st.code(st.session_state.extracted.get("ascii_process", "No process visualization available."))
             st.markdown("### ASCII Stakeholder Hierarchy")
@@ -287,6 +299,7 @@ elif st.session_state.step == 2:
                         "stakeholders": stakeholders,
                         "issues": [i.strip() for i in issues.split("\n") if i.strip()],
                         "process": [p.strip() for p in process.split("\n") if p.strip()],
+                        "external_factors": [e.strip() for e in external_factors.split("\n") if e.strip()],
                         "ascii_process": generate_ascii_process([p.strip() for p in process.split("\n") if p.strip()]),
                         "ascii_stakeholders": generate_ascii_stakeholders(stakeholders)
                     }
@@ -311,7 +324,7 @@ elif st.session_state.step == 2:
 # Step 3: Review Personas
 elif st.session_state.step == 3:
     st.header("Step 3: Meet Your Stakeholders")
-    st.info("Discover and manage AI-crafted personas, or search previously saved personas.")
+    st.info("Review and modify the AI-crafted personas, or search previously saved personas.")
     
     st.markdown("### Search Saved Personas")
     saved_personas = get_all_personas()
