@@ -1,15 +1,13 @@
-import json
 import os
 from openai import OpenAI
 from typing import List, Dict, Tuple
-from config import MAX_TOKENS, TIMEOUT_S
 
 def summarize_and_analyze(transcript: List[Dict]) -> Tuple[str, List[str], str]:
     """
-    Analyze the debate transcript to provide a detailed summary, extract keywords, and suggest optimizations using xAI's Grok-3-Mini-Beta.
+    Summarize the debate, extract keywords, identify faultlines, chokepoints, and provide optimization suggestions.
 
     Args:
-        transcript (List[Dict]): Debate transcript with agent and message.
+        transcript (List[Dict]): Debate transcript with agent, round, step, and message.
 
     Returns:
         Tuple[str, List[str], str]: Summary, keywords, and optimization suggestion.
@@ -19,43 +17,44 @@ def summarize_and_analyze(transcript: List[Dict]) -> Tuple[str, List[str], str]:
         api_key=os.getenv("XAI_API_KEY")
     )
 
+    transcript_json = json.dumps(transcript, indent=2)
+
     prompt = (
-        "You are Grok-3-Mini-Beta, an AI specializing in deep analysis of decision-making debates. Given a debate transcript, provide:\n"
-        "1. **Summary** (150–200 words): A concise overview of the debate, highlighting key arguments, stakeholder positions, and outcomes.\n"
-        "2. **Keywords** (8–12): Thematic keywords reflecting core issues and dynamics (e.g., 'humanitarian aid', 'security').\n"
-        "3. **Suggestion** (100–150 words): Actionable recommendations to improve decision-making, addressing:\n"
-        "   - **Faultlines**: Conflicts between stakeholders (e.g., opposing priorities).\n"
-        "   - **Chokepoints**: Process steps or dynamics slowing progress (e.g., budget constraints).\n"
-        "   - **Contentious Issues**: Topics sparking debate (e.g., resource allocation).\n"
-        "   - **Improvements**: Specific changes to stakeholder roles, process steps, or mitigation of biases.\n"
-        "Return a JSON object with keys: 'summary' (string), 'keywords' (list of strings), 'suggestion' (string).\n"
-        f"Transcript:\n{json.dumps(transcript, indent=2)}\n"
-        "Wrap the response in triple backticks (```json\n...\n```)."
+        "You are an AI assistant analyzing a decision-making debate transcript. Your task is to:\n"
+        "1. Summarize the debate in 150–200 words, capturing key arguments, decisions, and outcomes.\n"
+        "2. Extract 10–15 keywords that represent the main themes (e.g., humanitarian, security, budget).\n"
+        "3. Identify faultlines (major conflicts or disagreements between stakeholders, e.g., humanitarian focus vs. security priorities).\n"
+        "4. Identify chokepoints (process bottlenecks or constraints, e.g., budget limitations, lack of consensus).\n"
+        "5. Provide actionable recommendations (150–200 words) to optimize the decision-making process, such as role adjustments, process changes, or mitigation strategies for faultlines and chokepoints.\n"
+        "Return the results in JSON format with fields 'summary', 'keywords', 'faultlines', 'chokepoints', and 'suggestion'.\n"
+        f"Transcript:\n{transcript_json}\n"
     )
 
     try:
         completion = client.chat.completions.create(
-            model="grok-3-mini-beta",
-            reasoning_effort="high",
-            messages=[{"role": "user", "content": prompt}],
+            model="grok-3-beta",
+            messages=[
+                {"role": "system", "content": "You are an AI assistant analyzing debate transcripts."},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0.7,
-            max_tokens=MAX_TOKENS,
+            max_tokens=1500,
             response_format={"type": "json_object"}
         )
-        print(f"Summarization Reasoning: {completion.choices[0].message.reasoning_content}")
-        content = completion.choices[0].message.content
-        if content.startswith("```json\n") and content.endswith("\n```"):
-            content = content[7:-4].strip()
-        result = json.loads(content)
-        return (
-            result.get("summary", "No summary available."),
-            result.get("keywords", ["decision", "stakeholder", "debate"]),
-            result.get("suggestion", "No suggestion available.")
-        )
+        result = json.loads(completion.choices[0].message.content)
+        summary = result.get("summary", "No summary generated.")
+        keywords = result.get("keywords", [])
+        faultlines = result.get("faultlines", "No faultlines identified.")
+        chokepoints = result.get("chokepoints", "No chokepoints identified.")
+        suggestion = result.get("suggestion", "No suggestions provided.")
+
+        # Combine faultlines and chokepoints into the suggestion for display
+        enhanced_suggestion = f"Faultlines: {faultlines}\nChokepoints: {chokepoints}\nRecommendations: {suggestion}"
+        return summary, keywords, enhanced_suggestion
+
     except Exception as e:
-        print(f"Summarization API Error: {str(e)}")
-        return (
-            "The debate focused on stakeholder priorities but lacked consensus.",
-            ["decision", "stakeholder", "debate"],
-            "Encourage structured facilitation to align stakeholders."
-        )
+        print(f"Summarization Error: {str(e)}")
+        summary = "The debate focused on key decision points, but a detailed summary could not be generated due to an error."
+        keywords = ["decision", "stakeholders", "process", "debate"]
+        suggestion = "Consider reviewing the process steps and stakeholder roles to ensure alignment and clarity."
+        return summary, keywords, suggestion
