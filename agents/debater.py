@@ -45,15 +45,15 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
         for s in extracted.get("stakeholders", []):
             name = s["name"]
             role = stakeholder_roles.get(name, "")
-            if i == 0 and ("EAP" in role or "USAID" in role or "F)" in step):  # Situation Assessment
+            if i == 0 and ("EAP" in role or "USAID" in role or "Assessment" in step.lower()):
                 step_assignments[i].append(name)
-            elif i == 1 and ("PM" in role or "EB" in role or "BHA" in role):  # Options Development
+            elif i == 1 and ("PM" in role or "EB" in role or "BHA" in role or "options" in step.lower()):
                 step_assignments[i].append(name)
-            elif i == 2 and ("USAID" in role or "DoD" in role or "OMB" in role):  # Interagency Coordination
+            elif i == 2 and ("USAID" in role or "DoD" in role or "OMB" in role or "coordination" in step.lower()):
                 step_assignments[i].append(name)
-            elif i == 3:  # Task Force Deliberation
+            elif i == 3 and ("deliberation" in step.lower()):
                 step_assignments[i].append(name)
-            elif i == 4 and ("OMB" in role or "Senate" in role):  # Recommendation and Approval
+            elif i == 4 and ("OMB" in role or "Senate" in role or "approval" in step.lower()):
                 step_assignments[i].append(name)
 
     # Initialize cumulative context
@@ -62,12 +62,22 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
     if scenarios:
         cumulative_context += f"Alternative Scenarios/External Factors: {scenarios}\n"
 
+    # Define specific prompts for each round to guide meaningful discussion
+    round_prompts = [
+        "Assess the situation: Identify the key challenges and priorities in the dilemma. Propose initial strategies to address them, considering your goals and biases.",
+        "Develop options: Propose 2–3 actionable options to address the challenges identified in Round 1. Evaluate the pros and cons of each option, referencing the initial strategies proposed.",
+        "Coordinate and collaborate: Discuss how to align on one of the options from Round 2. Address conflicts by proposing compromises, referencing prior points, and considering external factors.",
+        "Deliberate as a group: Debate the chosen option from Round 3, focusing on implementation details. Anticipate challenges and suggest mitigation strategies, building on prior discussions.",
+        "Finalize and recommend: Agree on a final recommendation based on Round 4 discussions. Justify your stance, summarize the consensus, and propose next steps, referencing the entire debate."
+    ]
+
     # Simulate debate round by round
     for round_num in range(rounds):
         current_step = process_steps[round_num]
         active_stakeholders = step_assignments[round_num] if step_assignments[round_num] else [p["name"] for p in personas]
+        specific_prompt = round_prompts[round_num] if round_num < len(round_prompts) else "Continue the discussion, building on prior rounds to finalize the decision."
 
-        # Updated prompt for improved realism
+        # Enhanced prompt for meaningful discussion
         prompt = (
             "You are Grok-3-Beta, facilitating a human-like, constructive debate among stakeholders at a virtual roundtable. "
             "The debate must follow the decision-making process, with each round corresponding to a specific step. "
@@ -75,11 +85,12 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
             "For this round:\n"
             f"- Step: {current_step} (Round {round_num + 1})\n"
             f"- Active Stakeholders: {', '.join(active_stakeholders)}\n"
+            f"- Specific Task: {specific_prompt}\n"
             "Each active stakeholder should:\n"
             "- Contribute a 300–400 word response, deeply tied to the dilemma’s specifics and the current process step.\n"
             "- Use Chain-of-Thought reasoning: Think step by step about your goals, biases, tone, bio, and expected negotiation behavior before proposing a solution.\n"
             "- Act proactively, proposing actionable solutions, anticipating challenges, and suggesting innovations.\n"
-            "- **Explicitly reference and build on specific points from the cumulative context**, e.g., 'As [Stakeholder X] noted in Round 1 about [point], I propose...' or 'I disagree with [Stakeholder Y]'s earlier suggestion because...'.\n"
+            "- **Explicitly reference and build on specific points from the cumulative context**, e.g., 'As [Stakeholder X] noted in Round 1 about [point], I propose...' or 'I disagree with [Stakeholder Y]'s suggestion because...'.\n"
             "- Engage constructively with other stakeholders’ previous arguments, proposing compromises and resolving conflicts.\n"
             "- Consider alternative scenarios or external factors, if provided, when making proposals.\n"
             f"Cumulative Context from Previous Rounds:\n{cumulative_context}\n"
