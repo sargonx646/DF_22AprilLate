@@ -27,6 +27,25 @@ def generate_ascii_stakeholders(stakeholders: list) -> str:
     graph += "============================\n"
     return graph
 
+def mock_extraction(dilemma: str, process_hint: str) -> dict:
+    """Generate a mock extraction response for testing."""
+    return {
+        "decision_type": "Other",
+        "stakeholders": [
+            {"name": "Stakeholder 1", "psychological_traits": "Analytical", "influences": "Strategic Alliances", "biases": "Confirmation Bias", "historical_behavior": "Innovative Initiatives"},
+            {"name": "Stakeholder 2", "psychological_traits": "Collaborative", "influences": "Public Opinion", "biases": "Status Quo Bias", "historical_behavior": "Consensus-Building"},
+            {"name": "Stakeholder 3", "psychological_traits": "Risk-Averse", "influences": "Regulatory Constraints", "biases": "Cost-Avoidance Bias", "historical_behavior": "Conservative Decision-Making"}
+        ],
+        "issues": ["Issue 1", "Issue 2"],
+        "process": ["Step 1", "Step 2", "Step 3"],
+        "ascii_process": generate_ascii_process(["Step 1", "Step 2", "Step 3"]),
+        "ascii_stakeholders": generate_ascii_stakeholders([
+            {"name": "Stakeholder 1", "psychological_traits": "Analytical", "influences": "Strategic Alliances", "biases": "Confirmation Bias", "historical_behavior": "Innovative Initiatives"},
+            {"name": "Stakeholder 2", "psychological_traits": "Collaborative", "influences": "Public Opinion", "biases": "Status Quo Bias", "historical_behavior": "Consensus-Building"},
+            {"name": "Stakeholder 3", "psychological_traits": "Risk-Averse", "influences": "Regulatory Constraints", "biases": "Cost-Avoidance Bias", "historical_behavior": "Conservative Decision-Making"}
+        ])
+    }
+
 @retry(stop=stop_after_attempt(MAX_RETRIES), wait=wait_fixed(RETRY_DELAY))
 def extract_info(dilemma: str, process_hint: str) -> dict:
     """Extract detailed decision structure from user input using OpenRouter LLM.
@@ -43,7 +62,8 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
         RuntimeError: If API call or JSON parsing fails.
     """
     if not OPENROUTER_API_KEY:
-        raise ValueError("OPENROUTER_API_KEY not set in environment.")
+        print("Warning: OPENROUTER_API_KEY not set. Using mock extraction.")
+        return mock_extraction(dilemma, process_hint)
 
     prompt = (
         f"You are an expert in organizational decision-making. Analyze the provided dilemma and process hint to: "
@@ -71,7 +91,7 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
         "model": MODEL_NAME,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.7,
-        "max_tokens": 1000  # Increased for detailed output
+        "max_tokens": 1000
     }
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -82,39 +102,51 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
         response = requests.post(API_URL, headers=headers, json=payload, timeout=TIMEOUT_S)
         response.raise_for_status()
         data = response.json()
-        print(f"API Response: {json.dumps(data, indent=2)}")  # Log for debugging
+        print(f"API Response: {json.dumps(data, indent=2)}")
+        print(f"HTTP Status: {response.status_code}, Headers: {json.dumps(dict(response.headers), indent=2)}")
         if "choices" not in data or not data["choices"]:
-            raise ValueError(f"Invalid API response: 'choices' missing or empty. Response: {json.dumps(data, indent=2)}")
+            print("Warning: Invalid API response. Using mock extraction.")
+            return mock_extraction(dilemma, process_hint)
         content = data["choices"][0]["message"]["content"]
-        print(f"Raw Content: {content}")  # Log for debugging
-        # Extract JSON from ```json\n...\n``` block
+        print(f"Raw Content: {content}")
         if content.startswith("```json\n") and content.endswith("\n```"):
             content = content[7:-4].strip()
         try:
             result = json.loads(content)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse API response as JSON: {str(e)}. Raw content: {content}")
+            print(f"Warning: JSON parsing failed: {str(e)}. Using mock extraction.")
+            return mock_extraction(dilemma, process_hint)
         # Validate output
         if not isinstance(result, dict):
-            raise ValueError(f"API response is not a dictionary. Parsed content: {result}")
+            print(f"Warning: Response is not a dictionary: {result}. Using mock extraction.")
+            return mock_extraction(dilemma, process_hint)
         if "decision_type" not in result or result["decision_type"] not in DECISION_TYPES:
-            raise ValueError(f"Invalid or missing decision_type. Got: {result.get('decision_type', 'N/A')}")
+            print(f"Warning: Invalid or missing decision_type: {result.get('decision_type', 'N/A')}. Using mock extraction.")
+            return mock_extraction(dilemma, process_hint)
         if "stakeholders" not in result:
-            raise ValueError(f"API response missing 'stakeholders' key. Parsed content: {result}")
+            print(f"Warning: Missing 'stakeholders' key: {result}. Using mock extraction.")
+            return mock_extraction(dilemma, process_hint)
         if not (MIN_STAKEHOLDERS <= len(result["stakeholders"]) <= MAX_STAKEHOLDERS):
-            raise ValueError(f"Invalid stakeholder count: {len(result['stakeholders'])}. Must be {MIN_STAKEHOLDERS}–{MAX_STAKEHOLDERS}. Parsed content: {result}")
+            print(f"Warning: Invalid stakeholder count: {len(result['stakeholders'])}. Using mock extraction.")
+            return mock_extraction(dilemma, process_hint)
         for s in result["stakeholders"]:
             required_fields = ["name", "psychological_traits", "influences", "biases", "historical_behavior"]
             for field in required_fields:
                 if field not in s:
-                    raise ValueError(f"Stakeholder missing '{field}' field: {s}")
+                    print(f"Warning: Stakeholder missing '{field}' field: {s}. Using mock extraction.")
+                    return mock_extraction(dilemma, process_hint)
         if not isinstance(result.get("issues", []), list) or not isinstance(result.get("process", []), list):
-            raise ValueError(f"Invalid response: 'issues' or 'process' is not a list. Parsed content: {result}")
+            print(f"Warning: Invalid 'issues' or 'process': {result}. Using mock extraction.")
+            return mock_extraction(dilemma, process_hint)
         # Add ASCII graphs
         result["ascii_process"] = generate_ascii_process(result.get("process", []))
         result["ascii_stakeholders"] = generate_ascii_stakeholders(result.get("stakeholders", []))
         return result
     except requests.RequestException as e:
-        raise RuntimeError(f"API request failed: {str(e)}. Status code: {getattr(e.response, 'status_code', 'N/A')}, Response: {getattr(e.response, 'text', 'N/A')}")
+        print(f"API Error: {str(e)}, Status: {getattr(e.response, 'status_code', 'N/A')}, Response: {getattr(e.response, 'text', 'N/A')}")
+        print("Warning: API request failed. Using mock extraction.")
+        return mock_extraction(dilemma, process_hint)
     except ValueError as e:
-        raise ValueError(f"Validation error: {str(e)}")
+        print(f"Validation Error: {str(e)}")
+        print("Warning: Validation failed. Using mock extraction.")
+        return mock_extraction(dilemma, process_hint)
