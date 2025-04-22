@@ -1,64 +1,50 @@
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# OpenRouter API configuration
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "xai/grok-3-mini"  # Switched to Grok 3 Mini for better reasoning
-TIMEOUT_S = 15
+# xAI API configuration
+API_URL = "https://api.x.ai/v1"
+MODEL_NAME = "grok-3-mini-beta"
+TIMEOUT_S = 30
 MAX_RETRIES = 3
-RETRY_DELAY = 1
-MAX_TOKENS = 2000  # Increased for Grok 3 Mini's capabilities
+RETRY_DELAY = 2
+MAX_TOKENS = 4000
 
-# Application settings
-MAX_STAKEHOLDERS = 10
+# Decision-making configuration
 MIN_STAKEHOLDERS = 3
-DEBATE_ROUNDS = 3
-
-# Decision type categories
+MAX_STAKEHOLDERS = 10
 DECISION_TYPES = [
-    "Budget Allocation",
     "Foreign Policy",
     "Corporate Strategy",
-    "Humanitarian Response",
-    "Regulatory Compliance",
-    "Operational Efficiency",
+    "Community Development",
     "Other"
 ]
-
-# Psychological traits, influences, biases, and historical behavior options
 STAKEHOLDER_ANALYSIS = {
     "psychological_traits": [
-        "Risk-Averse",
-        "Risk-Tolerant",
-        "Collaborative",
-        "Authoritative",
-        "Empathetic",
         "Analytical",
-        "Impulsive"
+        "Empathetic",
+        "Authoritative",
+        "Collaborative",
+        "Risk-Averse",
+        "Risk-Tolerant"
     ],
     "influences": [
+        "Strategic Alliances",
+        "Public Opinion",
         "Political Pressure",
         "Financial Incentives",
-        "Public Opinion",
         "Regulatory Constraints",
-        "Strategic Alliances",
         "Personal Ambition"
     ],
     "biases": [
         "Confirmation Bias",
-        "Status Quo Bias",
         "Optimism Bias",
-        "Cost-Avoidance Bias",
-        "Groupthink"
+        "Groupthink",
+        "Status Quo Bias",
+        "Cost-Avoidance Bias"
     ],
     "historical_behavior": [
-        "Conservative Decision-Making",
+        "Consensus-Building",
         "Innovative Initiatives",
+        "Conservative Decision-Making",
         "Compliance-Driven",
-        "Aggressive Expansion",
-        "Consensus-Building"
+        "Aggressive Expansion"
     ]
 }
+DEBATE_ROUNDS = 3
