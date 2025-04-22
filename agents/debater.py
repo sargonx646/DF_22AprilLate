@@ -4,15 +4,16 @@ from openai import OpenAI
 from typing import List, Dict
 from config import DEBATE_ROUNDS, MAX_TOKENS, TIMEOUT_S
 
-def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extracted: Dict, rounds: int = DEBATE_ROUNDS) -> List[Dict]:
+def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extracted: Dict, scenarios: str = "", rounds: int = DEBATE_ROUNDS) -> List[Dict]:
     """
-    Simulate a human-like, constructive debate among stakeholder personas using xAI's Grok-3-Beta, guided by their personalities and the decision-making process.
+    Simulate a human-like, constructive debate among stakeholder personas using xAI's Grok-3-Beta, guided by their personalities, the decision-making process, and alternative scenarios.
 
     Args:
         personas (List[Dict]): List of personas with name, goals, biases, tone, bio, and expected behavior.
         dilemma (str): The user-provided decision dilemma.
         process_hint (str): The user-provided process and stakeholder details.
         extracted (Dict): Extracted decision structure with process steps and stakeholder roles.
+        scenarios (str): Optional alternative scenarios or external factors.
         rounds (int): Number of debate rounds, aligned with process steps.
 
     Returns:
@@ -58,13 +59,15 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
     # Initialize cumulative context
     cumulative_context = "Initial Context: The debate begins with the following dilemma and process.\n"
     cumulative_context += f"Dilemma: {dilemma}\nProcess: {process_hint}\n"
+    if scenarios:
+        cumulative_context += f"Alternative Scenarios/External Factors: {scenarios}\n"
 
     # Simulate debate round by round
     for round_num in range(rounds):
         current_step = process_steps[round_num]
         active_stakeholders = step_assignments[round_num] if step_assignments[round_num] else [p["name"] for p in personas]
 
-        # Generic prompt for the current round
+        # Generic prompt for the current round with CoT and collaboration
         prompt = (
             "You are Grok-3-Beta, facilitating a human-like, constructive debate among stakeholders at a virtual roundtable. "
             "The debate must follow the decision-making process, with each round corresponding to a specific step. "
@@ -74,10 +77,11 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
             f"- Active Stakeholders: {', '.join(active_stakeholders)}\n"
             "Each active stakeholder should:\n"
             "- Contribute a 300–400 word response, deeply tied to the dilemma’s specifics and the current process step.\n"
-            "- Base their arguments on their profile: goals, biases, tone, bio (career history, motivations), and expected negotiation behavior.\n"
+            "- Use Chain-of-Thought reasoning: Think step by step about your goals, biases, tone, bio (career history, motivations), and expected negotiation behavior before proposing a solution.\n"
             "- Act proactively, proposing actionable solutions, anticipating challenges, and suggesting innovations.\n"
-            "- Build on the previous step’s outcomes (provided in the cumulative context), ensuring their contribution informs the next step.\n"
-            "- Engage constructively with other stakeholders’ previous arguments, referencing their points, resolving conflicts, and collaborating to advance the decision.\n"
+            "- Build on the previous step’s outcomes (provided in the cumulative context), ensuring your contribution informs the next step.\n"
+            "- Engage constructively with other stakeholders’ previous arguments, referencing their points, proposing compromises, and resolving conflicts to advance the decision.\n"
+            "- Consider alternative scenarios or external factors, if provided, when making proposals.\n"
             f"Cumulative Context from Previous Rounds:\n{cumulative_context}\n"
             f"Stakeholder Profiles:\n{json.dumps(personas, indent=2)}\n"
             "Return a JSON array of objects with 'agent' (stakeholder name), 'round' (round number), 'step' (process step name), and 'message' (their statement). "
