@@ -1,14 +1,18 @@
 import json
+import os
 from openai import OpenAI
 from typing import List, Dict
 from config import DEBATE_ROUNDS, MAX_TOKENS, TIMEOUT_S
 
-def simulate_debate(personas: List[Dict], rounds: int = DEBATE_ROUNDS) -> List[Dict]:
+def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extracted: Dict, rounds: int = DEBATE_ROUNDS) -> List[Dict]:
     """
-    Simulate a debate among stakeholder personas using xAI's Grok-3-Mini-Beta.
+    Simulate a creative and context-aware debate among stakeholder personas using xAI's Grok-3-Mini-Beta.
 
     Args:
         personas (List[Dict]): List of personas with name, goals, biases, and tone.
+        dilemma (str): The decision dilemma.
+        process_hint (str): Process and stakeholder details.
+        extracted (Dict): Extracted decision structure.
         rounds (int): Number of debate rounds.
 
     Returns:
@@ -16,7 +20,7 @@ def simulate_debate(personas: List[Dict], rounds: int = DEBATE_ROUNDS) -> List[D
     """
     client = OpenAI(
         base_url="https://api.x.ai/v1",
-        api_key="xai-RXSTGBf9LckPtkQ6aBySC0LmpdIjqq9fSSK49PcdRvpLHmldwXEuPwlK9n9AsNfXsHps86amuUFE053u"
+        api_key=os.getenv("XAI_API_KEY")
     )
 
     transcript = []
@@ -24,11 +28,29 @@ def simulate_debate(personas: List[Dict], rounds: int = DEBATE_ROUNDS) -> List[D
     messages = [
         {
             "role": "system",
-            "content": "You are Grok-3-Mini-Beta, facilitating a debate among stakeholders. Each stakeholder has a name, goals, biases, and tone. Simulate a realistic debate where each stakeholder speaks in their tone, pursues their goals, and reflects their biases. Generate one response per stakeholder per round, ensuring diverse perspectives and constructive dialogue. Return a JSON array of objects with 'agent' (stakeholder name) and 'message' (their statement)."
+            "content": (
+                "You are Grok-3-Mini-Beta, facilitating a highly creative and meaningful debate among stakeholders at a virtual roundtable. "
+                "Each stakeholder has a name, goals, biases, tone, psychological traits, influences, and historical behavior. "
+                "Simulate a dynamic, context-aware debate where each stakeholder:\n"
+                "- Proposes specific, innovative solutions aligned with their goals and the dilemma’s context.\n"
+                "- Reflects their psychological traits (e.g., Analytical, Empathetic), influences (e.g., Political Pressure), and biases (e.g., Confirmation Bias).\n"
+                "- Uses their tone (e.g., diplomatic, assertive) and considers their historical behavior (e.g., Consensus-Building).\n"
+                "- Critically engages with others’ proposals, countering or building on them to advance the discussion.\n"
+                "- Focuses on the dilemma’s issues and process steps, ensuring discussions are substantive and meaningful.\n"
+                f"Generate {rounds} rounds, with each stakeholder contributing a 50–70 word response per round. "
+                "Return a JSON array of objects with 'agent' (stakeholder name) and 'message' (their statement). "
+                "Ensure diversity in perspectives, avoid repetition, and maintain a professional yet engaging tone."
+            )
         },
         {
             "role": "user",
-            "content": f"Simulate {rounds} rounds of debate for these stakeholders:\n{json.dumps(personas, indent=2)}\nReturn the transcript as a JSON array."
+            "content": (
+                f"Dilemma: {dilemma}\n"
+                f"Process Hint: {process_hint}\n"
+                f"Extracted Structure: {json.dumps(extracted, indent=2)}\n"
+                f"Stakeholders: {json.dumps(personas, indent=2)}\n"
+                f"Simulate {rounds} rounds of debate. Return the transcript as a JSON array."
+            )
         }
     ]
 
@@ -37,7 +59,7 @@ def simulate_debate(personas: List[Dict], rounds: int = DEBATE_ROUNDS) -> List[D
             model="grok-3-mini-beta",
             reasoning_effort="high",
             messages=messages,
-            temperature=0.7,
+            temperature=0.8,  # Higher for creativity
             max_tokens=MAX_TOKENS,
             response_format={"type": "json_object"}
         )
@@ -51,7 +73,7 @@ def simulate_debate(personas: List[Dict], rounds: int = DEBATE_ROUNDS) -> List[D
                 for p in personas:
                     transcript.append({
                         "agent": p["name"],
-                        "message": f"{p['name']} proposes focusing on {p['goals'][0]} in a {p['tone']} tone."
+                        "message": f"{p['name']} proposes focusing on {p['goals'][0]} in a {p['tone']} tone, considering {p['biases'][0]}."
                     })
     except Exception as e:
         print(f"Debate API Error: {str(e)}")
@@ -59,7 +81,7 @@ def simulate_debate(personas: List[Dict], rounds: int = DEBATE_ROUNDS) -> List[D
             for p in personas:
                 transcript.append({
                     "agent": p["name"],
-                    "message": f"{p['name']} proposes focusing on {p['goals'][0]} in a {p['tone']} tone."
+                    "message": f"{p['name']} proposes focusing on {p['goals'][0]} in a {p['tone']} tone, considering {p['biases'][0]}."
                 })
 
     return transcript
