@@ -519,6 +519,7 @@ elif st.session_state.step == 4:
         except Exception as e:
             st.error(f"Analysis failed: {str(e)}")
 
+
 # Step 5: View Results
 elif st.session_state.step == 5:
     st.header("Step 5: Unlock Your Insights")
@@ -540,10 +541,11 @@ elif st.session_state.step == 5:
         try:
             with open("network_graph.html", "r") as f:
                 html_content = f.read()
-            st.components.v1.html(html_content, height=400)
+            # Ensure the HTML content is rendered with sufficient height
+            st.components.v1.html(html_content, height=500, scrolling=True)
             st.caption("Stakeholder Interaction Network")
         except FileNotFoundError:
-            st.warning("Network graph unavailable.")
+            st.warning("Network graph unavailable. Please ensure the simulation completed successfully.")
     
     st.markdown("### Export Your Results")
     col1, col2, col3, col4 = st.columns(4)
