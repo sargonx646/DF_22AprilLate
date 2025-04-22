@@ -23,7 +23,7 @@ st.markdown('<script src="/static/js/animations.js"></script>', unsafe_allow_htm
 st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">', unsafe_allow_html=True)
 
 # Display the DecisionForge logo above the title
-st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/decisionforge_logo.png", width=300)
+st.image("https://raw.githubusercontent.com/sargonx646/DF_22AprilLate/refs/heads/main/assets/decisionforge_logo.png.png", width=300)
 
 # Custom header with title and description
 st.markdown('''
