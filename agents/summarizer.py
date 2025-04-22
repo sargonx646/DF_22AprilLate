@@ -1,3 +1,4 @@
+import json
 import os
 from openai import OpenAI
 from typing import List, Dict, Tuple
@@ -20,12 +21,12 @@ def summarize_and_analyze(transcript: List[Dict]) -> Tuple[str, List[str], str]:
     transcript_json = json.dumps(transcript, indent=2)
 
     prompt = (
-        "You are an AI assistant analyzing a decision-making debate transcript. Your task is to:\n"
-        "1. Summarize the debate in 150–200 words, capturing key arguments, decisions, and outcomes.\n"
+        "You are an AI assistant analyzing a decision-making debate transcript for DecisionTwin. Your task is to:\n"
+        "1. Summarize the debate in 150–200 words, capturing key arguments, decisions, and outcomes across all rounds.\n"
         "2. Extract 10–15 keywords that represent the main themes (e.g., humanitarian, security, budget).\n"
         "3. Identify faultlines (major conflicts or disagreements between stakeholders, e.g., humanitarian focus vs. security priorities).\n"
         "4. Identify chokepoints (process bottlenecks or constraints, e.g., budget limitations, lack of consensus).\n"
-        "5. Provide actionable recommendations (150–200 words) to optimize the decision-making process, such as role adjustments, process changes, or mitigation strategies for faultlines and chokepoints.\n"
+        "5. Provide actionable recommendations (150–200 words) to optimize the decision-making process, such as role adjustments, process changes, or mitigation strategies for faultlines and chokepoints. Include specific steps to improve stakeholder collaboration and decision outcomes.\n"
         "Return the results in JSON format with fields 'summary', 'keywords', 'faultlines', 'chokepoints', and 'suggestion'.\n"
         f"Transcript:\n{transcript_json}\n"
     )
