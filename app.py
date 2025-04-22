@@ -210,9 +210,7 @@ elif st.session_state.step == 2:
             # Decision Type Section
             st.markdown("### Decision Type")
             extracted_decision_type = st.session_state.extracted.get("decision_type", "Other")
-            # Handle cases where decision_type includes annotations like "(Assumed)"
             base_decision_type = extracted_decision_type.split(" (")[0].strip()
-            # Ensure the base_decision_type exists in DECISION_TYPES, default to "Other" if not
             if base_decision_type not in DECISION_TYPES:
                 base_decision_type = "Other"
             decision_type = st.selectbox(
@@ -239,7 +237,7 @@ elif st.session_state.step == 2:
             }
             </style>
             """, unsafe_allow_html=True)
-            cols = st.columns(4)  # 4 cards per row
+            cols = st.columns(4)
             stakeholders = []
             for i, s in enumerate(st.session_state.extracted.get("stakeholders", [])):
                 with cols[i % 4]:
@@ -248,27 +246,33 @@ elif st.session_state.step == 2:
                     role = st.text_input(f"Role", value=s.get("role", ""), key=f"stakeholder_role_{i}")
                     traits = st.text_area(
                         f"Psychological Traits (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['psychological_traits'])})",
-                        value=s.get("psychological_traits", ""),
+                        value=s.get("psychological_traits", "Analytical (Inferred by AI)"),
                         key=f"stakeholder_traits_{i}",
                         height=50
                     )
                     influences = st.text_area(
                         f"Influences (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['influences'])})",
-                        value=s.get("influences", ""),
+                        value=s.get("influences", "Public Opinion (Inferred by AI)"),
                         key=f"stakeholder_influences_{i}",
                         height=50
                     )
                     biases = st.text_area(
                         f"Biases (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['biases'])})",
-                        value=s.get("biases", ""),
+                        value=s.get("biases", "Confirmation Bias (Inferred by AI)"),
                         key=f"stakeholder_biases_{i}",
                         height=50
                     )
                     history = st.text_area(
                         f"Historical Behavior (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['historical_behavior'])})",
-                        value=s.get("historical_behavior", ""),
+                        value=s.get("historical_behavior", "Consensus-Driven (Inferred by AI)"),
                         key=f"stakeholder_history_{i}",
                         height=50
+                    )
+                    bio = st.text_area(
+                        f"Bio (Update or leave as is)",
+                        value=s.get("bio", ""),
+                        key=f"stakeholder_bio_{i}",
+                        height=100
                     )
                     st.markdown('</div>', unsafe_allow_html=True)
                     stakeholders.append({
@@ -277,7 +281,8 @@ elif st.session_state.step == 2:
                         "psychological_traits": traits,
                         "influences": influences,
                         "biases": biases,
-                        "historical_behavior": history
+                        "historical_behavior": history,
+                        "bio": bio
                     })
 
             # Issues Section
@@ -423,7 +428,7 @@ elif st.session_state.step == 4:
     st.header("Step 4: Experience the Debate")
     st.info("Witness your stakeholders debate in real-time, following the decision-making process. Ready to analyze the results?")
     
-    # Custom CSS for debate visualization
+    # Custom CSS for debate visualization with fade-in effect
     st.markdown('''
     <style>
     .debate-container {
@@ -453,16 +458,14 @@ elif st.session_state.step == 4:
         padding: 15px;
         margin-bottom: 15px;
         font-size: 14px;
-        animation: fadeInOut 5s ease-in-out;
+        animation: fadeIn 2s ease-in-out;
         z-index: 10;
         opacity: 0.8;
         line-height: 1.5;
     }
-    @keyframes fadeInOut {
+    @keyframes fadeIn {
         0% { opacity: 0; transform: translateY(20px); }
-        10% { opacity: 0.8; transform: translateY(0); }
-        90% { opacity: 0.8; transform: translateY(0); }
-        100% { opacity: 0; transform: translateY(-20px); }
+        100% { opacity: 0.8; transform: translateY(0); }
     }
     </style>
     ''', unsafe_allow_html=True)
