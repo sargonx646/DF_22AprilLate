@@ -3,9 +3,16 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import plotly.graph_objects as go
 import plotly.express as px
-from textblob import TextBlob
-from gensim import corpora
-from gensim.models import LdaModel
+try:
+    from textblob import TextBlob
+except ImportError:
+    TextBlob = None
+try:
+    from gensim import corpora
+    from gensim.models import LdaModel
+except ImportError:
+    corpora = None
+    LdaModel = None
 from typing import List, Dict
 import numpy as np
 import pandas as pd
@@ -161,60 +168,66 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
         print(f"Timeline Chart Generation Error: {str(e)}")
 
     # 4. Sentiment Analysis Plot
-    try:
-        sentiments = []
-        for entry in transcript:
-            blob = TextBlob(entry["message"])
-            sentiment = blob.sentiment.polarity  # Range: -1 (negative) to 1 (positive)
-            sentiments.append({
-                "Agent": entry["agent"],
-                "Round": entry["round"],
-                "Sentiment": "Positive" if sentiment > 0.1 else "Negative" if sentiment < -0.1 else "Neutral"
-            })
-
-        df = pd.DataFrame(sentiments)
-        fig = px.bar(
-            df,
-            x="Round",
-            y="Agent",
-            color="Sentiment",
-            title="Sentiment Analysis of Stakeholder Contributions",
-            color_discrete_map={"Positive": "green", "Neutral": "gray", "Negative": "red"}
-        )
-        fig.write_html("sentiment_chart.html", include_plotlyjs='cdn')
-    except Exception as e:
-        print(f"Sentiment Analysis Chart Generation Error: {str(e)}")
-
-    # 5. Topic Modeling Bar Chart
-    try:
-        # Prepare text data for topic modeling
-        texts = [entry["message"].lower().split() for entry in transcript]
-        dictionary = corpora.Dictionary(texts)
-        corpus = [dictionary.doc2bow(text) for text in texts]
-
-        # Train LDA model
-        lda_model = LdaModel(corpus, num_topics=3, id2word=dictionary, passes=10)
-        topics = lda_model.print_topics(num_words=5)
-        topic_data = []
-        for topic_id, topic in topics:
-            terms = topic.split("+")
-            for term in terms:
-                weight, word = term.split("*")
-                topic_data.append({
-                    "Topic": f"Topic {topic_id + 1}",
-                    "Term": word.strip('"'),
-                    "Weight": float(weight)
+    if TextBlob:
+        try:
+            sentiments = []
+            for entry in transcript:
+                blob = TextBlob(entry["message"])
+                sentiment = blob.sentiment.polarity  # Range: -1 (negative) to 1 (positive)
+                sentiments.append({
+                    "Agent": entry["agent"],
+                    "Round": entry["round"],
+                    "Sentiment": "Positive" if sentiment > 0.1 else "Negative" if sentiment < -0.1 else "Neutral"
                 })
 
-        df = pd.DataFrame(topic_data)
-        fig = px.bar(
-            df,
-            x="Weight",
-            y="Term",
-            color="Topic",
-            title="Top Terms in Identified Topics",
-            orientation='h'
-        )
-        fig.write_html("topic_modeling_chart.html", include_plotlyjs='cdn')
-    except Exception as e:
-        print(f"Topic Modeling Chart Generation Error: {str(e)}")
+            df = pd.DataFrame(sentiments)
+            fig = px.bar(
+                df,
+                x="Round",
+                y="Agent",
+                color="Sentiment",
+                title="Sentiment Analysis of Stakeholder Contributions",
+                color_discrete_map={"Positive": "green", "Neutral": "gray", "Negative": "red"}
+            )
+            fig.write_html("sentiment_chart.html", include_plotlyjs='cdn')
+        except Exception as e:
+            print(f"Sentiment Analysis Chart Generation Error: {str(e)}")
+    else:
+        print("TextBlob not available. Skipping sentiment analysis chart.")
+
+    # 5. Topic Modeling Bar Chart
+    if corpora and LdaModel:
+        try:
+            # Prepare text data for topic modeling
+            texts = [entry["message"].lower().split() for entry in transcript]
+            dictionary = corpora.Dictionary(texts)
+            corpus = [dictionary.doc2bow(text) for text in texts]
+
+            # Train LDA model
+            lda_model = LdaModel(corpus, num_topics=3, id2word=dictionary, passes=10)
+            topics = lda_model.print_topics(num_words=5)
+            topic_data = []
+            for topic_id, topic in topics:
+                terms = topic.split("+")
+                for term in terms:
+                    weight, word = term.split("*")
+                    topic_data.append({
+                        "Topic": f"Topic {topic_id + 1}",
+                        "Term": word.strip('"'),
+                        "Weight": float(weight)
+                    })
+
+            df = pd.DataFrame(topic_data)
+            fig = px.bar(
+                df,
+                x="Weight",
+                y="Term",
+                color="Topic",
+                title="Top Terms in Identified Topics",
+                orientation='h'
+            )
+            fig.write_html("topic_modeling_chart.html", include_plotlyjs='cdn')
+        except Exception as e:
+            print(f"Topic Modeling Chart Generation Error: {str(e)}")
+    else:
+        print("Gensim not available. Skipping topic modeling chart.")
