@@ -1,76 +1,65 @@
 import json
-import requests
-from tenacity import retry, stop_after_attempt, wait_fixed
-from config import OPENROUTER_API_KEY, API_URL, MODEL_NAME, TIMEOUT_S, MAX_RETRIES, RETRY_DELAY, DEBATE_ROUNDS, MAX_TOKENS
+from openai import OpenAI
+from typing import List, Dict
+from config import DEBATE_ROUNDS, MAX_TOKENS, TIMEOUT_S
 
-def mock_debate(personas: list[dict], rounds: int = DEBATE_ROUNDS) -> list[dict]:
-    """Mock debate simulation for testing."""
-    print(f"Mocking debate for {len(personas)} personas: {[p['name'] for p in personas]}")
-    transcript = []
-    for r in range(rounds):
-        for p in personas:
-            transcript.append({
-                "agent": p["name"],
-                "message": f"{p['name']} proposes focusing on {p['goals'][0]} in a {p['tone']} tone."
-            })
-    return transcript
-
-@retry(stop=stop_after_attempt(MAX_RETRIES), wait=wait_fixed(RETRY_DELAY))
-def simulate_debate(personas: list[dict], rounds: int = DEBATE_ROUNDS) -> list[dict]:
-    """Simulate a debate among personas using Grok 3 Mini.
+def simulate_debate(personas: List[Dict], rounds: int = DEBATE_ROUNDS) -> List[Dict]:
+    """
+    Simulate a debate among stakeholder personas using xAI's Grok-3-Mini-Beta.
 
     Args:
-        personas: List of persona dictionaries with name, goals, biases, tone.
-        rounds: Number of debate rounds.
+        personas (List[Dict]): List of personas with name, goals, biases, and tone.
+        rounds (int): Number of debate rounds.
 
     Returns:
-        List of debate entries with agent and message.
+        List[Dict]: Debate transcript with agent and message.
     """
-    if not OPENROUTER_API_KEY:
-        print("Warning: OPENROUTER_API_KEY not set. Using mock debate.")
-        return mock_debate(personas, rounds)
+    client = OpenAI(
+        base_url="https://api.x.ai/v1",
+        api_key="xai-RXSTGBf9LckPtkQ6aBySC0LmpdIjqq9fSSK49PcdRvpLHmldwXEuPwlK9n9AsNfXsHps86amuUFE053u"
+    )
 
     transcript = []
-    for r in range(rounds):
-        for persona in personas:
-            prompt = (
-                f"You are {persona['name']}, a stakeholder with goals: {', '.join(persona['goals'])}, "
-                f"biases: {', '.join(persona['biases'])}, and tone: {persona['tone']}. "
-                f"In a debate about the decision context, propose an action or perspective "
-                f"aligned with your goals in your specified tone. Keep the response concise (50–100 words)."
-            )
-            payload = {
-                "model": MODEL_NAME,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 150
-            }
-            headers = {
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            try:
-                response = requests.post(API_URL, headers=headers, json=payload, timeout=TIMEOUT_S)
-                response.raise_for_status()
-                data = response.json()
-                print(f"Debate API Response for {persona['name']}: {json.dumps(data, indent=2)}")
-                if "choices" not in data or not data["choices"]:
-                    print(f"Warning: Invalid API response for {persona['name']}. Using mock message.")
+    # Initialize conversation history
+    messages = [
+        {
+            "role": "system",
+            "content": "You are Grok-3-Mini-Beta, facilitating a debate among stakeholders. Each stakeholder has a name, goals, biases, and tone. Simulate a realistic debate where each stakeholder speaks in their tone, pursues their goals, and reflects their biases. Generate one response per stakeholder per round, ensuring diverse perspectives and constructive dialogue. Return a JSON array of objects with 'agent' (stakeholder name) and 'message' (their statement)."
+        },
+        {
+            "role": "user",
+            "content": f"Simulate {rounds} rounds of debate for these stakeholders:\n{json.dumps(personas, indent=2)}\nReturn the transcript as a JSON array."
+        }
+    ]
+
+    try:
+        completion = client.chat.completions.create(
+            model="grok-3-mini-beta",
+            reasoning_effort="high",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=MAX_TOKENS,
+            response_format={"type": "json_object"}
+        )
+        print(f"Debate Reasoning: {completion.choices[0].message.reasoning_content}")
+        transcript_data = json.loads(completion.choices[0].message.content)
+        if isinstance(transcript_data, list):
+            transcript = transcript_data
+        else:
+            print("Warning: Invalid transcript format. Using fallback.")
+            for r in range(rounds):
+                for p in personas:
                     transcript.append({
-                        "agent": persona["name"],
-                        "message": f"{persona['name']} proposes focusing on {persona['goals'][0]} in a {persona['tone']} tone."
+                        "agent": p["name"],
+                        "message": f"{p['name']} proposes focusing on {p['goals'][0]} in a {p['tone']} tone."
                     })
-                    continue
-                content = data["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print(f"Debate API Error: {str(e)}")
+        for r in range(rounds):
+            for p in personas:
                 transcript.append({
-                    "agent": persona["name"],
-                    "message": content
+                    "agent": p["name"],
+                    "message": f"{p['name']} proposes focusing on {p['goals'][0]} in a {p['tone']} tone."
                 })
-            except requests.RequestException as e:
-                print(f"API Error for {persona['name']}: {str(e)}, Status: {getattr(e.response, 'status_code', 'N/A')}, Response: {getattr(e.response, 'text', 'N/A')}")
-                print(f"Warning: API request failed for {persona['name']}. Using mock message.")
-                transcript.append({
-                    "agent": persona["name"],
-                    "message": f"{persona['name']} proposes focusing on {persona['goals'][0]} in a {persona['tone']} tone."
-                })
+
     return transcript
