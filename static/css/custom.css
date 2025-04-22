@@ -1,0 +1,113 @@
+/* Custom styles for DecisionForge */
+.header-container {
+    text-align: center;
+    padding: 20px;
+    background: linear-gradient(135deg, #FF4B4B, #F0F2F6);
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.header-title {
+    color: #FFFFFF;
+    font-size: 2.5em;
+    margin: 0;
+}
+
+.header-subtitle {
+    color: #FFFFFF;
+    font-size: 1.2em;
+    margin: 5px 0;
+}
+
+.persona-card {
+    background: #F0F2F6;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
+    transition: transform 0.2s;
+}
+
+.persona-card:hover {
+    transform: scale(1.05);
+}
+
+.debate-container {
+    background: #FFFFFF;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.debate-message {
+    background: #F0F2F6;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 5px;
+    animation: fadeIn 0.5s;
+}
+
+.summary-box, .suggestion-box {
+    background: #FF4B4B;
+    color: #FFFFFF;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+}
+
+.cta-box {
+    text-align: center;
+    padding: 20px;
+    background: #F0F2F6;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.cta-box button {
+    background: #FF4B4B;
+    color: #FFFFFF;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.1em;
+}
+
+.cta-box button:hover {
+    background: #E04343;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #FFFFFF;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 500px;
+    text-align: center;
+}
+
+.modal-content button {
+    background: #FF4B4B;
+    color: #FFFFFF;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
