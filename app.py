@@ -178,7 +178,10 @@ Stakeholder Dynamics:
     }
 ]
 
-# Custom header with images and description
+# Display the DecisionForge logo above the title
+st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/decisionforge_logo.png", width=300)
+
+# Custom header with title and description
 st.markdown('''
 <div class="header-container">
     <h1 class="header-title">Twin Decision Making AI Companion</h1>
@@ -186,21 +189,12 @@ st.markdown('''
 </div>
 ''', unsafe_allow_html=True)
 
-# Add DecisionForge images and description
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/geometric_shape.png", width=100)
-    st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/decisionforge_logo.png", width=300)
-    st.markdown("""
-    **DecisionForge: Shape the Future of Decisions**  
-    DecisionForge empowers leaders to forge impactful strategies through AI-driven simulations. By recreating complex decision environments, it illuminates stakeholder dynamics, uncovers hidden insights, and drives optimal outcomes—transforming challenges into opportunities with precision and clarity.
-    """)
-
 # Initialize session state
 if "step" not in st.session_state:
     st.session_state.step = 1
     st.session_state.dilemma = ""
     st.session_state.process_hint = ""
+    st.session_state.scenarios = ""  # New field for scenarios
     st.session_state.extracted = None
     st.session_state.personas = []
     st.session_state.transcript = []
@@ -210,6 +204,7 @@ if "step" not in st.session_state:
     st.session_state.prompt_index = 0
 
 # Sidebar with progress and navigation
+st.sidebar.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/geometric_shape.png", width=100)
 st.sidebar.title("Decision-Making Journey")
 st.sidebar.markdown("Track your simulation progress:")
 progress = st.sidebar.progress(st.session_state.step / 5)
@@ -281,6 +276,14 @@ if st.session_state.step == 1:
             height=200,
             help="Detail the decision-making process (steps, timeline) and/or key stakeholders (names, roles, priorities)."
         )
+        st.markdown('<h4><i class="fas fa-exclamation-circle"></i> Alternative Scenarios or External Factors (Optional)</h4>', unsafe_allow_html=True)
+        scenarios = st.text_area(
+            "",
+            value=st.session_state.scenarios,
+            placeholder="E.g., Increased political pressure for security spending, budget cuts of 20%, delays in aid delivery.",
+            height=150,
+            help="Provide alternative scenarios or external factors to test different outcomes (optional)."
+        )
         col1, col2 = st.columns(2)
         with col1:
             submitted = st.form_submit_button("Extract Decision Structure")
@@ -289,6 +292,7 @@ if st.session_state.step == 1:
                 st.session_state.prompt_index = (st.session_state.prompt_index + 1) % len(SAMPLE_PROMPTS)
                 st.session_state.dilemma = SAMPLE_PROMPTS[st.session_state.prompt_index]["dilemma"]
                 st.session_state.process_hint = SAMPLE_PROMPTS[st.session_state.prompt_index]["process_hint"]
+                st.session_state.scenarios = ""
                 st.rerun()
         if submitted:
             if not dilemma.strip() or not process_hint.strip():
@@ -298,6 +302,7 @@ if st.session_state.step == 1:
                     with st.spinner("Analyzing your decision process..."):
                         st.session_state.dilemma = dilemma
                         st.session_state.process_hint = process_hint
+                        st.session_state.scenarios = scenarios
                         st.session_state.extracted = extract_info(dilemma, process_hint)
                     st.session_state.step = 2
                     st.success("Decision structure extracted successfully!")
@@ -399,7 +404,6 @@ elif st.session_state.step == 2:
                     else:
                         st.session_state.extracted = edited_extracted
                         with st.spinner("Crafting stakeholder personas..."):
-                            # Pass dilemma and process_hint to build_personas
                             st.session_state.personas = build_personas(
                                 [s["name"] for s in edited_extracted["stakeholders"]],
                                 st.session_state.dilemma,
@@ -480,7 +484,8 @@ elif st.session_state.step == 3:
                     personas=st.session_state.personas,
                     dilemma=st.session_state.dilemma,
                     process_hint=st.session_state.process_hint,
-                    extracted=st.session_state.extracted
+                    extracted=st.session_state.extracted,
+                    scenarios=st.session_state.scenarios
                 )
             st.session_state.step = 4
             st.success("Simulation complete! Watch the debate unfold.")
