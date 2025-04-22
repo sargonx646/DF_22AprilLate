@@ -1,5 +1,6 @@
 import json
 import requests
+import re
 from tenacity import retry, stop_after_attempt, wait_fixed
 from config import OPENROUTER_API_KEY, API_URL, MODEL_NAME, TIMEOUT_S, MAX_RETRIES, RETRY_DELAY, MIN_STAKEHOLDERS, MAX_STAKEHOLDERS, DECISION_TYPES, STAKEHOLDER_ANALYSIS, MAX_TOKENS
 
@@ -8,11 +9,13 @@ def generate_ascii_process(process: list) -> str:
     if not process:
         return "No process steps provided."
     graph = "=== Decision Process Timeline ===\n"
-    graph += "┌───────────────────────────────┐\n"
+    graph += "┌────┬──────────────────────────────────────────────────┐\n"
+    graph += "│ No │ Step Description                                 │\n"
+    graph += "├────┼──────────────────────────────────────────────────┤\n"
     for i, step in enumerate(process, 1):
-        step = step[:50] + "..." if len(step) > 50 else step
-        graph += f"│ Step {i:<2} │ {step:<45} │\n"
-        graph += "├───────────────────────────────┤\n" if i < len(process) else "└───────────────────────────────┘\n"
+        step = step[:45] + "..." if len(step) > 45 else step.ljust(45)
+        graph += f"│ {i:<2} │ {step} │\n"
+    graph += "└────┴──────────────────────────────────────────────────┘\n"
     graph += "================================\n"
     return graph
 
@@ -21,41 +24,50 @@ def generate_ascii_stakeholders(stakeholders: list) -> str:
     if not stakeholders:
         return "No stakeholders provided."
     graph = "=== Stakeholder Hierarchy ===\n"
-    graph += "┌──────────────────────────────────────────────────┐\n"
+    graph += "┌────┬────────────────────┬────────────────────┬────────────────────┬────────────────────┬────────────────────┐\n"
+    graph += "│ No │ Name               │ Traits             │ Influences         │ Biases             │ History            │\n"
+    graph += "├────┼────────────────────┼────────────────────┼────────────────────┼────────────────────┼────────────────────┤\n"
     for i, s in enumerate(stakeholders, 1):
-        name = s['name'][:20] + "..." if len(s['name']) > 20 else s['name']
-        graph += f"│ {i:<2}. │ {name:<20} │ Traits: {s.get('psychological_traits', 'N/A'):<15} │\n"
-        graph += f"│    │ {'':<20} │ Infl: {s.get('influences', 'N/A'):<15} │\n"
-        graph += f"│    │ {'':<20} │ Bias: {s.get('biases', 'N/A'):<15} │\n"
-        graph += f"│    │ {'':<20} │ Hist: {s.get('historical_behavior', 'N/A'):<15} │\n"
-        graph += "├──────────────────────────────────────────────────┤\n" if i < len(stakeholders) else "└──────────────────────────────────────────────────┘\n"
+        name = s['name'][:18] + "..." if len(s['name']) > 18 else s['name'].ljust(18)
+        traits = s.get('psychological_traits', 'N/A')[:18].ljust(18)
+        infl = s.get('influences', 'N/A')[:18].ljust(18)
+        biases = s.get('biases', 'N/A')[:18].ljust(18)
+        hist = s.get('historical_behavior', 'N/A')[:18].ljust(18)
+        graph += f"│ {i:<2} │ {name} │ {traits} │ {infl} │ {biases} │ {hist} │\n"
+    graph += "└────┴────────────────────┴────────────────────┴────────────────────┴────────────────────┴────────────────────┘\n"
     graph += "============================\n"
     return graph
 
 def mock_extraction(dilemma: str, process_hint: str) -> dict:
     """Generate a mock extraction response based on input prompt."""
-    # Parse process_hint for stakeholders if possible
+    # Parse stakeholders from process_hint
     stakeholders = []
-    stakeholder_lines = [line.strip() for line in process_hint.split('\n') if line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.'))]
-    for i, line in enumerate(stakeholder_lines[:MAX_STAKEHOLDERS], 1):
-        name = line.split(':')[0].replace(f"{i}.", "").strip() or f"Stakeholder {i}"
+    stakeholder_pattern = r'(\d+\.\s+[\w\s,]+?:.*?)(?=\n\d+\.|$)'  # Match numbered stakeholder lines
+    matches = re.findall(stakeholder_pattern, process_hint, re.DOTALL)
+    for i, match in enumerate(matches[:MAX_STAKEHOLDERS], 1):
+        name = match.split(':')[0].strip().replace(f"{i}.", "").strip()
+        if not name:
+            name = f"Stakeholder {i}"
+        description = match.split(':')[1].strip() if ':' in match else ""
+        traits = "Analytical" if "strategy" in description.lower() else "Empathetic" if "humanitarian" in description.lower() else STAKEHOLDER_ANALYSIS['psychological_traits'][i % len(STAKEHOLDER_ANALYSIS['psychological_traits'])]
         stakeholders.append({
             "name": name,
-            "psychological_traits": STAKEHOLDER_ANALYSIS['psychological_traits'][i % len(STAKEHOLDER_ANALYSIS['psychological_traits'])],
+            "psychological_traits": traits,
             "influences": STAKEHOLDER_ANALYSIS['influences'][i % len(STAKEHOLDER_ANALYSIS['influences'])],
             "biases": STAKEHOLDER_ANALYSIS['biases'][i % len(STAKEHOLDER_ANALYSIS['biases'])],
             "historical_behavior": STAKEHOLDER_ANALYSIS['historical_behavior'][i % len(STAKEHOLDER_ANALYSIS['historical_behavior'])]
         })
-    # Fallback if no stakeholders found
-    if not stakeholders:
-        stakeholders = [
-            {"name": "Stakeholder 1", "psychological_traits": "Analytical", "influences": "Strategic Alliances", "biases": "Confirmation Bias", "historical_behavior": "Consensus-Building"},
-            {"name": "Stakeholder 2", "psychological_traits": "Empathetic", "influences": "Public Opinion", "biases": "Optimism Bias", "historical_behavior": "Innovative Initiatives"},
-            {"name": "Stakeholder 3", "psychological_traits": "Authoritative", "influences": "Political Pressure", "biases": "Groupthink", "historical_behavior": "Conservative Decision-Making"}
-        ]
-    issues = ["Issue 1", "Issue 2", "Issue 3"]  # Generic fallback
-    process = ["Step 1", "Step 2", "Step 3"]
-    # For State Department prompt, use specific data
+    # Parse issues from dilemma
+    issue_pattern = r'(\d+\.\s+.*?)(?=\n\d+\.|$)'  # Match numbered challenges
+    issues = [match.strip().split(':')[0].strip().replace(f"{i+1}.", "").strip() for i, match in enumerate(re.findall(issue_pattern, dilemma, re.DOTALL))]
+    if not issues:
+        issues = ["Unknown issue 1", "Unknown issue 2", "Unknown issue 3"]
+    # Parse process steps from process_hint
+    process_pattern = r'(\d+\.\s+.*?)(?=\n\d+\.|$)'  # Match numbered steps
+    process = [match.strip().split(':')[0].strip().replace(f"{i+1}.", "").strip() for i, match in enumerate(re.findall(process_pattern, process_hint, re.DOTALL))]
+    if not process:
+        process = ["Unknown step 1", "Unknown step 2", "Unknown step 3"]
+    # State Department-specific mock
     if "State Department" in dilemma or "Indo-Pacific" in dilemma:
         stakeholders = [
             {"name": "Elizabeth Carter", "psychological_traits": "Analytical", "influences": "Strategic Alliances", "biases": "Confirmation Bias", "historical_behavior": "Consensus-Building"},
@@ -66,12 +78,12 @@ def mock_extraction(dilemma: str, process_hint: str) -> dict:
             {"name": "Rebecca Ortiz", "psychological_traits": "Risk-Averse", "influences": "Personal Ambition", "biases": "Confirmation Bias", "historical_behavior": "Conservative Decision-Making"},
             {"name": "Robert Kline", "psychological_traits": "Authoritative", "influences": "Political Pressure", "biases": "Groupthink", "historical_behavior": "Compliance-Driven"}
         ]
-        issues = ["Humanitarian crisis", "Security threats", "Economic instability", "Political viability"]
+        issues = ["Humanitarian crisis in Country A", "Security threats in Country B", "Economic instability in Country C", "Political viability"]
         process = ["Situation Assessment", "Options Development", "Interagency Coordination", "Task Force Deliberation", "Recommendation and Approval"]
     return {
         "decision_type": "Foreign Policy" if "State Department" in dilemma else "Other",
         "stakeholders": stakeholders,
-        "issues": issues,
+        "issues": issues[:5],
         "process": process,
         "ascii_process": generate_ascii_process(process),
         "ascii_stakeholders": generate_ascii_stakeholders(stakeholders)
@@ -93,27 +105,32 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
         return mock_extraction(dilemma, process_hint)
 
     prompt = (
-        f"You are an expert in organizational decision-making with advanced reasoning capabilities. Thoroughly analyze the provided dilemma and process hint to: "
-        f"1. Categorize the decision type ({', '.join(DECISION_TYPES)}) based on the context (e.g., budget allocation, policy, corporate strategy). "
-        f"2. Extract {MIN_STAKEHOLDERS}–{MAX_STAKEHOLDERS} key stakeholders (humans or entities) exactly as named in the input, preserving full names and titles. "
-        f"For each stakeholder, provide: "
-        f"- name: Exact name from input (e.g., 'Elizabeth Carter', not 'Stakeholder 1'). "
-        f"- psychological_traits: Select one from {', '.join(STAKEHOLDER_ANALYSIS['psychological_traits'])} based on their role and context. "
-        f"- influences: Select one from {', '.join(STAKEHOLDER_ANALYSIS['influences'])} based on their priorities. "
-        f"- biases: Select one from {', '.join(STAKEHOLDER_ANALYSIS['biases'])} based on their behavior. "
-        f"- historical_behavior: Select one from {', '.join(STAKEHOLDER_ANALYSIS['historical_behavior'])} based on past actions. "
-        f"3. Identify 3–5 specific issues central to the dilemma (e.g., 'Humanitarian crisis', not 'Issue 1'), derived from the context. "
-        f"4. Extract the process steps in chronological order, using descriptive names (e.g., 'Situation Assessment', not 'Step 1') from the input or inferred logically. "
+        f"You are Grok 3 Mini, an advanced AI specializing in organizational decision-making. Your task is to deeply analyze the provided dilemma and process hint to extract a precise decision framework. Follow these instructions carefully:\n"
+        f"1. **Decision Type**: Determine the decision type from {', '.join(DECISION_TYPES)} by analyzing the dilemma’s context. "
+        f"For example, select 'Foreign Policy' for international aid allocation, 'Corporate Strategy' for business investments, or 'Other' if unclear.\n"
+        f"2. **Stakeholders**: Identify {MIN_STAKEHOLDERS}–{MAX_STAKEHOLDERS} stakeholders, which are specific individuals (e.g., 'Elizabeth Carter') or entities (e.g., 'USAID') explicitly named in the process hint. "
+        f"Extract their full names exactly as provided, preserving titles and avoiding generic terms like 'Stakeholder 1'. "
+        f"For each stakeholder, infer attributes based on their role, description, or priorities in the process hint:\n"
+        f"- psychological_traits: Select one from {', '.join(STAKEHOLDER_ANALYSIS['psychological_traits'])} (e.g., 'Empathetic' for humanitarian advocates, 'Analytical' for strategic planners).\n"
+        f"- influences: Select one from {', '.join(STAKEHOLDER_ANALYSIS['influences'])} (e.g., 'Political Pressure' for government officials, 'Financial Incentives' for business leaders).\n"
+        f"- biases: Select one from {', '.join(STAKEHOLDER_ANALYSIS['biases'])} (e.g., 'Groupthink' for consensus-driven, 'Confirmation Bias' for entrenched views).\n"
+        f"- historical_behavior: Select one from {', '.join(STAKEHOLDER_ANALYSIS['historical_behavior'])} (e.g., 'Compliance-Driven' for regulatory focus, 'Innovative Initiatives' for reformists).\n"
+        f"If the process hint lacks explicit stakeholders, infer plausible stakeholders from the context, ensuring they are specific entities or roles.\n"
+        f"3. **Issues**: Extract 3–5 specific issues directly from the dilemma’s challenges, avoiding generic terms like 'Issue 1'. "
+        f"For example, for a dilemma about regional stabilization, issues might include 'Humanitarian crisis in Country A', 'Security threats in Country B', 'Economic instability in Country C'.\n"
+        f"4. **Process Steps**: Extract the decision-making process steps in chronological order from the process hint, using descriptive names (e.g., 'Situation Assessment', not 'Step 1'). "
+        f"If steps are not explicitly listed, infer 3–5 logical steps based on the context (e.g., assessment, planning, coordination, decision). Ensure steps reflect the timeline or structure provided.\n"
         f"Return a JSON object with keys: 'decision_type', 'stakeholders' (list of objects), 'issues' (list), 'process' (list). "
-        f"Ensure 'stakeholders' contains {MIN_STAKEHOLDERS}–{MAX_STAKEHOLDERS} entries, names match input exactly, issues and process are specific, and the response is valid JSON. "
+        f"Ensure 'stakeholders' has {MIN_STAKEHOLDERS}–{MAX_STAKEHOLDERS} entries, names match the input exactly, issues and process are specific, and the response is valid JSON. "
         f"Wrap the JSON in triple backticks (```json\n...\n```). Example:\n"
         "```json\n"
         "{\n  \"decision_type\": \"Foreign Policy\",\n"
         "  \"stakeholders\": [\n    {\"name\": \"Elizabeth Carter\", \"psychological_traits\": \"Analytical\", "
         "\"influences\": \"Strategic Alliances\", \"biases\": \"Confirmation Bias\", "
-        "\"historical_behavior\": \"Consensus-Building\"}\n  ],\n"
-        "  \"issues\": [\"Humanitarian crisis\", \"Security threats\"],\n"
-        "  \"process\": [\"Situation Assessment\", \"Options Development\"]\n}\n"
+        "\"historical_behavior\": \"Consensus-Building\"},\n    {\"name\": \"USAID\", \"psychological_traits\": \"Collaborative\", "
+        "\"influences\": \"Public Opinion\", \"biases\": \"Optimism Bias\", \"historical_behavior\": \"Innovative Initiatives\"}\n  ],\n"
+        "  \"issues\": [\"Humanitarian crisis in Country A\", \"Security threats in Country B\", \"Economic instability in Country C\"],\n"
+        "  \"process\": [\"Situation Assessment\", \"Options Development\", \"Interagency Coordination\", \"Task Force Deliberation\", \"Recommendation and Approval\"]\n}\n"
         "```\n\n"
         f"Dilemma: {dilemma}\nProcess Hint: {process_hint}"
     )
@@ -121,9 +138,9 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
     payload = {
         "model": MODEL_NAME,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.3,  # Lowered for precision
+        "temperature": 0.1,  # Extremely low for precision
         "max_tokens": MAX_TOKENS,
-        "reasoning": {"effort": "high"}  # High reasoning for Grok 3 Mini
+        "reasoning": {"effort": "high"}  # Maximize reasoning
     }
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -148,7 +165,7 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
         except json.JSONDecodeError as e:
             print(f"Warning: JSON parsing failed: {str(e)}. Using mock extraction.")
             return mock_extraction(dilemma, process_hint)
-        # Relaxed validation
+        # Relaxed validation with defaults
         if not isinstance(result, dict):
             print(f"Warning: Response is not a dictionary: {result}. Using mock extraction.")
             return mock_extraction(dilemma, process_hint)
@@ -164,6 +181,10 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
             required_fields = ["name", "psychological_traits", "influences", "biases", "historical_behavior"]
             for field in required_fields:
                 s[field] = s.get(field, STAKEHOLDER_ANALYSIS[field][0] if field != "name" else "Unknown")
+            # Verify stakeholder name exists in process_hint
+            if s["name"] != "Unknown" and s["name"] not in process_hint:
+                print(f"Warning: Stakeholder name '{s['name']}' not found in process_hint. Using mock extraction.")
+                return mock_extraction(dilemma, process_hint)
         result["issues"] = result.get("issues", ["Unknown issue"])
         result["process"] = result.get("process", ["Unknown step"])
         # Add ASCII graphs
