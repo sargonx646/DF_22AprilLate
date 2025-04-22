@@ -190,8 +190,8 @@ st.markdown('''
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     # Use raw GitHub URLs for the images (replace with your actual URLs after uploading)
-    st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/geometric_shape.png", width=100)
-    st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/decisionforge_logo.png", width=300)
+    st.image("https://raw.githubusercontent.com/sargonx646/DF_22AprilLate/refs/heads/main/assets/geometric_shape.png", width=100)
+    st.image("https://raw.githubusercontent.com/sargonx646/DF_22AprilLate/refs/heads/main/assets/decisionforge_logo.png", width=300)
     st.markdown("""
     **DecisionForge: Shape the Future of Decisions**  
     DecisionForge empowers leaders to forge impactful strategies through AI-driven simulations. By recreating complex decision environments, it illuminates stakeholder dynamics, uncovers hidden insights, and drives optimal outcomes—transforming challenges into opportunities with precision and clarity.
