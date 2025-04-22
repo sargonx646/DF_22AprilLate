@@ -75,7 +75,7 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
     # Simulate debate round by round
     for round_num in range(rounds):
         current_step = process_steps[round_num]
-        # Extract the step name for matching with objectives (e.g., "Data Collection" from "Data Collection (Week 1): ...")
+        # Extract the step name for matching with objectives
         step_key = current_step.split("(")[0].strip()
         objective = process_objectives.get(step_key, "Continue the discussion, building on prior rounds to finalize the decision from your perspective.")
 
@@ -88,8 +88,7 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
 
             # Tailored prompt for each stakeholder
             prompt = (
-                "You are Grok-3-Beta, simulating a stakeholder in a human-like, constructive debate for DecisionTwin. "
-                f"You are acting as {stakeholder_name}, with the role of {role}. "
+                f"You are Grok-3-Beta, simulating {stakeholder_name}, with the role of {role}. "
                 f"Your expertise and focus area: {focus_area}\n"
                 "Your characteristics:\n"
                 f"- Goals: {', '.join(persona['goals'])}\n"
@@ -104,52 +103,72 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
                 "- Contribute a 300–400 word response, deeply tied to the dilemma’s specifics and the current process step, from your role’s perspective.\n"
                 "- Use Chain-of-Thought reasoning: Think step by step about your goals, biases, tone, bio, and expected negotiation behavior before proposing a solution.\n"
                 "- Act proactively, proposing actionable solutions, anticipating challenges, and suggesting innovations within your domain.\n"
-                "- **Explicitly reference and build on specific points from the cumulative context**, e.g., 'As [Stakeholder X] noted in Round 1 about [point], I propose...' or 'I disagree with [Stakeholder Y]'s suggestion because...'.\n"
+                "- Explicitly reference and build on specific points from the cumulative context, e.g., 'As [Stakeholder X] noted in Round 1 about [point], I propose...' or 'I disagree with [Stakeholder Y]'s suggestion because...'.\n"
                 "- Engage constructively with other stakeholders’ previous arguments, proposing compromises and resolving conflicts.\n"
                 "- Consider alternative scenarios or external factors, if provided, when making proposals.\n"
-                f"Cumulative Context from Previous Rounds:\n{cumulative_context}\n"
-                "Return your response as a single string, representing your statement for this round."
+                f"Cumulative Context from Previous Rounds (summarized):\n{cumulative_context[:2000]}\n"  # Limit context to avoid token overflow
+                "Return your response as a JSON object with keys 'agent', 'round', 'step', and 'message'."
             )
 
-            # Retry logic for API calls
+            # Retry logic with exponential backoff
             max_retries = 3
+            retry_delay = 1
             for attempt in range(max_retries):
                 try:
                     completion = client.chat.completions.create(
                         model="grok-3-beta",
-                        reasoning_effort="high",
                         messages=[
                             {"role": "system", "content": "You are an AI assistant simulating a stakeholder in a debate."},
                             {"role": "user", "content": prompt}
                         ],
-                        temperature=0.8,
-                        max_tokens=MAX_TOKENS,
-                        timeout=TIMEOUT_S
+                        temperature=0.7,  # Lowered for more consistent output
+                        max_tokens=1000,  # Increased to ensure complete responses
+                        timeout=30  # Explicit timeout
                     )
-                    message = completion.choices[0].message.content.strip()
-                    if not message:
-                        raise ValueError("Empty response received.")
-                    break  # Successful response, exit retry loop
+                    raw_response = completion.choices[0].message.content
+                    try:
+                        response = json.loads(raw_response)
+                        if isinstance(response, dict) and all(key in response for key in ["agent", "round", "step", "message"]):
+                            round_transcript.append(response)
+                        else:
+                            raise ValueError("Invalid JSON structure")
+                    except json.JSONDecodeError as e:
+                        print(f"JSON Decode Error for {stakeholder_name} (Round {round_num + 1}, Attempt {attempt + 1}): {str(e)}")
+                        print(f"Raw Response: {raw_response}")
+                        if attempt == max_retries - 1:
+                            # Enhanced fallback
+                            fallback_message = (
+                                f"As {stakeholder_name}, with the role of {role}, I focus on {focus_area.lower()}. "
+                                f"Given my goal to {persona['goals'][0]} and my {persona['tone']} tone, I emphasize "
+                                f"{objective.lower().split(':')[0]} in {current_step}. Considering my {persona['biases'][0]}, "
+                                f"I would prioritize relevant data or perspectives. Unfortunately, detailed insights could not be generated."
+                            )
+                            round_transcript.append({
+                                "agent": stakeholder_name,
+                                "round": round_num + 1,
+                                "step": current_step,
+                                "message": fallback_message
+                            })
+                    break  # Success, exit retry loop
                 except Exception as e:
-                    print(f"Attempt {attempt + 1} failed for {stakeholder_name} (Round {round_num + 1}): {str(e)}")
-                    if attempt == max_retries - 1:  # Last attempt failed
-                        # Enhanced fallback response
-                        message = (
-                            f"As {stakeholder_name}, with the role of {role}, I approach this step with a focus on {focus_area.lower()}. "
-                            f"Given my goal to {persona['goals'][0]} and my {persona['tone']} tone, I would emphasize the importance of "
-                            f"considering {persona['goals'][0]} in {current_step}. Based on my {persona['biases'][0]}, I might prioritize "
-                            f"data or perspectives that align with this goal. However, detailed insights could not be generated due to a persistent error."
-                        )
+                    print(f"API Error for {stakeholder_name} (Round {round_num + 1}, Attempt {attempt + 1}): {str(e)}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
                     else:
-                        time.sleep(1)  # Wait before retrying
-                        continue
-
-            round_transcript.append({
-                "agent": stakeholder_name,
-                "round": round_num + 1,
-                "step": current_step,
-                "message": message
-            })
+                        # Enhanced fallback
+                        fallback_message = (
+                            f"As {stakeholder_name}, with the role of {role}, I focus on {focus_area.lower()}. "
+                            f"Given my goal to {persona['goals'][0]} and my {persona['tone']} tone, I emphasize "
+                            f"{objective.lower().split(':')[0]} in {current_step}. Considering my {persona['biases'][0]}, "
+                            f"I would prioritize relevant data or perspectives. Unfortunately, detailed insights could not be generated."
+                        )
+                        round_transcript.append({
+                            "agent": stakeholder_name,
+                            "round": round_num + 1,
+                            "step": current_step,
+                            "message": fallback_message
+                        })
 
         # Add round contributions to transcript and update cumulative context
         transcript.extend(round_transcript)
