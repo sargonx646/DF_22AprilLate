@@ -1,8 +1,8 @@
 import json
-import requests
 import re
+from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_fixed
-from config import OPENROUTER_API_KEY, API_URL, MODEL_NAME, TIMEOUT_S, MAX_RETRIES, RETRY_DELAY, MIN_STAKEHOLDERS, MAX_STAKEHOLDERS, DECISION_TYPES, STAKEHOLDER_ANALYSIS, MAX_TOKENS
+from config import DECISION_TYPES, STAKEHOLDER_ANALYSIS, MIN_STAKEHOLDERS, MAX_STAKEHOLDERS, TIMEOUT_S, MAX_RETRIES, RETRY_DELAY, MAX_TOKENS
 
 def generate_ascii_process(process: list) -> str:
     """Generate a clear ASCII graph for process steps."""
@@ -40,7 +40,6 @@ def generate_ascii_stakeholders(stakeholders: list) -> str:
 
 def mock_extraction(dilemma: str, process_hint: str) -> dict:
     """Generate a mock extraction response based on input prompt."""
-    # Parse stakeholders from process_hint
     stakeholders = []
     stakeholder_pattern = r'(\d+\.\s+[\w\s,]+?:.*?)(?=\n\d+\.|$)'  # Match numbered stakeholder lines
     matches = re.findall(stakeholder_pattern, process_hint, re.DOTALL)
@@ -57,17 +56,14 @@ def mock_extraction(dilemma: str, process_hint: str) -> dict:
             "biases": STAKEHOLDER_ANALYSIS['biases'][i % len(STAKEHOLDER_ANALYSIS['biases'])],
             "historical_behavior": STAKEHOLDER_ANALYSIS['historical_behavior'][i % len(STAKEHOLDER_ANALYSIS['historical_behavior'])]
         })
-    # Parse issues from dilemma
     issue_pattern = r'(\d+\.\s+.*?)(?=\n\d+\.|$)'  # Match numbered challenges
     issues = [match.strip().split(':')[0].strip().replace(f"{i+1}.", "").strip() for i, match in enumerate(re.findall(issue_pattern, dilemma, re.DOTALL))]
     if not issues:
         issues = ["Unknown issue 1", "Unknown issue 2", "Unknown issue 3"]
-    # Parse process steps from process_hint
     process_pattern = r'(\d+\.\s+.*?)(?=\n\d+\.|$)'  # Match numbered steps
     process = [match.strip().split(':')[0].strip().replace(f"{i+1}.", "").strip() for i, match in enumerate(re.findall(process_pattern, process_hint, re.DOTALL))]
     if not process:
         process = ["Unknown step 1", "Unknown step 2", "Unknown step 3"]
-    # State Department-specific mock
     if "State Department" in dilemma or "Indo-Pacific" in dilemma:
         stakeholders = [
             {"name": "Elizabeth Carter", "psychological_traits": "Analytical", "influences": "Strategic Alliances", "biases": "Confirmation Bias", "historical_behavior": "Consensus-Building"},
@@ -91,7 +87,7 @@ def mock_extraction(dilemma: str, process_hint: str) -> dict:
 
 @retry(stop=stop_after_attempt(MAX_RETRIES), wait=wait_fixed(RETRY_DELAY))
 def extract_info(dilemma: str, process_hint: str) -> dict:
-    """Extract detailed decision structure using Grok 3 Mini.
+    """Extract detailed decision structure using xAI's Grok-3-Mini-Beta.
 
     Args:
         dilemma (str): The decision dilemma.
@@ -100,12 +96,14 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
     Returns:
         dict: JSON with decision_type, stakeholders (list, 3–10, with analysis), issues, process, ascii graphs.
     """
-    if not OPENROUTER_API_KEY:
-        print("Warning: OPENROUTER_API_KEY not set. Using mock extraction.")
-        return mock_extraction(dilemma, process_hint)
+    # Initialize xAI API client
+    client = OpenAI(
+        base_url="https://api.x.ai/v1",
+        api_key="xai-RXSTGBf9LckPtkQ6aBySC0LmpdIjqq9fSSK49PcdRvpLHmldwXEuPwlK9n9AsNfXsHps86amuUFE053u"
+    )
 
     prompt = (
-        f"You are Grok 3 Mini, an advanced AI specializing in organizational decision-making. Your task is to deeply analyze the provided dilemma and process hint to extract a precise decision framework. Follow these instructions carefully:\n"
+        f"You are Grok-3-Mini-Beta, an advanced AI specializing in organizational decision-making. Your task is to deeply analyze the provided dilemma and process hint to extract a precise decision framework. Follow these instructions carefully:\n"
         f"1. **Decision Type**: Determine the decision type from {', '.join(DECISION_TYPES)} by analyzing the dilemma’s context. "
         f"For example, select 'Foreign Policy' for international aid allocation, 'Corporate Strategy' for business investments, or 'Other' if unclear.\n"
         f"2. **Stakeholders**: Identify {MIN_STAKEHOLDERS}–{MAX_STAKEHOLDERS} stakeholders, which are specific individuals (e.g., 'Elizabeth Carter') or entities (e.g., 'USAID') explicitly named in the process hint. "
@@ -135,40 +133,22 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
         f"Dilemma: {dilemma}\nProcess Hint: {process_hint}"
     )
 
-    payload = {
-        "model": MODEL_NAME,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.1,  # Extremely low for precision
-        "max_tokens": MAX_TOKENS,
-        "reasoning": {"effort": "high"}  # Maximize reasoning
-    }
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=TIMEOUT_S)
-        response.raise_for_status()
-        data = response.json()
-        print(f"API Response: {json.dumps(data, indent=2)}")
-        print(f"HTTP Status: {response.status_code}, Headers: {json.dumps(dict(response.headers), indent=2)}")
-        if "choices" not in data or not data["choices"]:
-            print("Warning: Invalid API response. Using mock extraction.")
-            return mock_extraction(dilemma, process_hint)
-        content = data["choices"][0]["message"]["content"]
-        print(f"Raw Content: {content}")
+        completion = client.chat.completions.create(
+            model="grok-3-mini-beta",
+            reasoning_effort="high",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=MAX_TOKENS,
+            response_format={"type": "json_object"}
+        )
+        print(f"Extraction Reasoning: {completion.choices[0].message.reasoning_content}")
+        content = completion.choices[0].message.content
         if content.startswith("```json\n") and content.endswith("\n```"):
             content = content[7:-4].strip()
-        try:
-            result = json.loads(content)
-        except json.JSONDecodeError as e:
-            print(f"Warning: JSON parsing failed: {str(e)}. Using mock extraction.")
-            return mock_extraction(dilemma, process_hint)
-        # Relaxed validation with defaults
-        if not isinstance(result, dict):
-            print(f"Warning: Response is not a dictionary: {result}. Using mock extraction.")
-            return mock_extraction(dilemma, process_hint)
+        result = json.loads(content)
+        
+        # Validation
         result["decision_type"] = result.get("decision_type", "Other")
         if result["decision_type"] not in DECISION_TYPES:
             print(f"Warning: Invalid decision_type: {result['decision_type']}. Setting to 'Other'.")
@@ -181,21 +161,15 @@ def extract_info(dilemma: str, process_hint: str) -> dict:
             required_fields = ["name", "psychological_traits", "influences", "biases", "historical_behavior"]
             for field in required_fields:
                 s[field] = s.get(field, STAKEHOLDER_ANALYSIS[field][0] if field != "name" else "Unknown")
-            # Verify stakeholder name exists in process_hint
             if s["name"] != "Unknown" and s["name"] not in process_hint:
                 print(f"Warning: Stakeholder name '{s['name']}' not found in process_hint. Using mock extraction.")
                 return mock_extraction(dilemma, process_hint)
         result["issues"] = result.get("issues", ["Unknown issue"])
         result["process"] = result.get("process", ["Unknown step"])
-        # Add ASCII graphs
         result["ascii_process"] = generate_ascii_process(result["process"])
         result["ascii_stakeholders"] = generate_ascii_stakeholders(result["stakeholders"])
         return result
-    except requests.RequestException as e:
-        print(f"API Error: {str(e)}, Status: {getattr(e.response, 'status_code', 'N/A')}, Response: {getattr(e.response, 'text', 'N/A')}")
+    except Exception as e:
+        print(f"API Error: {str(e)}")
         print("Warning: API request failed. Using mock extraction.")
-        return mock_extraction(dilemma, process_hint)
-    except ValueError as e:
-        print(f"Validation Error: {str(e)}")
-        print("Warning: Validation failed. Using mock extraction.")
         return mock_extraction(dilemma, process_hint)
