@@ -399,7 +399,12 @@ elif st.session_state.step == 2:
                     else:
                         st.session_state.extracted = edited_extracted
                         with st.spinner("Crafting stakeholder personas..."):
-                            st.session_state.personas = build_personas([s["name"] for s in edited_extracted["stakeholders"]])
+                            # Pass dilemma and process_hint to build_personas
+                            st.session_state.personas = build_personas(
+                                [s["name"] for s in edited_extracted["stakeholders"]],
+                                st.session_state.dilemma,
+                                st.session_state.process_hint
+                            )
                         st.session_state.step = 3
                         st.success("Personas generated successfully!")
                         st.rerun()
@@ -429,12 +434,16 @@ elif st.session_state.step == 3:
             goals = st.text_area("Goals", value=", ".join(persona_data["goals"]))
             biases = st.text_area("Biases", value=", ".join(persona_data["biases"]))
             tone = st.text_input("Tone", value=persona_data["tone"])
+            bio = st.text_area("Bio", value=persona_data["bio"], height=150)
+            expected_behavior = st.text_area("Expected Behavior", value=persona_data["expected_behavior"], height=100)
             if st.form_submit_button("Save Changes"):
                 updated_persona = {
                     "name": name,
                     "goals": goals.split(", "),
                     "biases": biases.split(", "),
-                    "tone": tone
+                    "tone": tone,
+                    "bio": bio,
+                    "expected_behavior": expected_behavior
                 }
                 st.session_state.personas = [updated_persona if p["name"] == selected_persona else p for p in st.session_state.personas]
                 st.success(f"Persona {name} updated!")
@@ -460,6 +469,8 @@ elif st.session_state.step == 3:
                 <p><strong>Goals:</strong> {', '.join(persona['goals'])}</p>
                 <p><strong>Biases:</strong> {', '.join(persona['biases'])}</p>
                 <p><strong>Tone:</strong> {persona['tone'].capitalize()}</p>
+                <p><strong>Bio:</strong> {persona['bio']}</p>
+                <p><strong>Expected Behavior:</strong> {persona['expected_behavior']}</p>
             </div>
             ''', unsafe_allow_html=True)
     if st.button("Launch Simulation", key="launch_simulation"):
@@ -482,7 +493,7 @@ elif st.session_state.step == 4:
     st.header("Step 4: Experience the Debate")
     st.info("Witness your stakeholders debate in real-time, following the decision-making process. Ready to analyze the results?")
     
-    # Custom CSS for roundtable visualization
+    # Custom CSS for debate visualization
     st.markdown('''
     <style>
     .debate-container {
@@ -493,27 +504,6 @@ elif st.session_state.step == 4:
         position: relative;
         min-height: 400px;
         overflow: hidden;
-    }
-    .roundtable {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        position: relative;
-        height: 200px;
-    }
-    .agent {
-        position: absolute;
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background-color: #007bff;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        text-align: center;
-        transition: transform 0.3s ease;
     }
     .debate-window {
         position: relative;
@@ -547,20 +537,8 @@ elif st.session_state.step == 4:
     </style>
     ''', unsafe_allow_html=True)
 
-    # Roundtable visualization
+    # Debate visualization
     st.markdown('<div class="debate-container">', unsafe_allow_html=True)
-    placeholder = st.empty()
-    
-    # Position agents around a virtual roundtable
-    agents = list(set(entry["agent"] for entry in st.session_state.transcript))
-    num_agents = len(agents)
-    radius = 100
-    agent_positions = {}
-    for i, agent in enumerate(agents):
-        angle = (2 * 3.14159 * i) / num_agents
-        x = 50 + radius * random.uniform(0.8, 1.2) * (1 if random.random() > 0.5 else -1)
-        y = 50 + radius * random.uniform(0.8, 1.2) * (1 if random.random() > 0.5 else -1)
-        agent_positions[agent] = (x, y)
     
     # Display debate with round and step information
     st.markdown('<div class="debate-window">', unsafe_allow_html=True)
@@ -577,13 +555,8 @@ elif st.session_state.step == 4:
             debate_placeholder.markdown(f"### Round {round_num}: {step}")
             current_round = round_num
         
-        # Generate HTML for the roundtable and speech bubble
-        html_content = '<div class="roundtable">'
-        for a, (ax, ay) in agent_positions.items():
-            active = "background-color: #ff6b6b;" if a == agent else ""
-            html_content += f'<div class="agent" style="{active} left: {ax}%; top: {ay}%;">{a}</div>'
-        html_content += '</div>'
-        html_content += f'<div class="speech-bubble"><strong>{agent}:</strong><br>{message}</div>'
+        # Generate HTML for the speech bubble
+        html_content = f'<div class="speech-bubble"><strong>{agent}:</strong><br>{message}</div>'
         
         with debate_placeholder.container():
             st.markdown(html_content, unsafe_allow_html=True)
@@ -632,9 +605,12 @@ elif st.session_state.step == 5:
             st.warning("Word cloud unavailable.")
     with col2:
         try:
-            st.image("heatmap.png", caption="Stakeholder Activity Heatmap", use_column_width=True)
+            with open("network_graph.html", "r") as f:
+                html_content = f.read()
+            st.components.v1.html(html_content, height=400)
+            st.caption("Stakeholder Interaction Network")
         except FileNotFoundError:
-            st.warning("Heatmap unavailable.")
+            st.warning("Network graph unavailable.")
     
     st.markdown("### Export Your Results")
     col1, col2, col3, col4 = st.columns(4)
@@ -665,15 +641,15 @@ elif st.session_state.step == 5:
             st.warning("Word cloud unavailable.")
     with col4:
         try:
-            with open("heatmap.png", "rb") as f:
+            with open("network_graph.html", "r") as f:
                 st.download_button(
-                    label="📊 Heatmap (PNG)",
+                    label="📊 Network Graph (HTML)",
                     data=f,
-                    file_name="heatmap.png",
-                    mime="image/png"
+                    file_name="network_graph.html",
+                    mime="text/html"
                 )
         except FileNotFoundError:
-            st.warning("Heatmap unavailable.")
+            st.warning("Network graph unavailable.")
     
     st.markdown('''
     <div class="cta-box">
