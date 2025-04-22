@@ -19,12 +19,12 @@ st.markdown('<script src="/static/js/animations.js"></script>', unsafe_allow_htm
 st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">', unsafe_allow_html=True)
 
 # Custom header with animation
-st.markdown("""
+st.markdown('''
 <div class="header-container">
     <h1 class="header-title">Twin Decision Making AI Companion</h1>
     <p class="header-subtitle">Recreate and Test Your Decision-Making Processes with AI-Powered Simulations</p>
 </div>
-""", unsafe_allow_html=True)
+''', unsafe_allow_html=True)
 
 # Initialize session state
 if "step" not in st.session_state:
@@ -62,7 +62,7 @@ if st.session_state.step > 4:
 
 # Onboarding modal (shown on first load)
 if not st.session_state.get("onboarding_seen", False):
-    st.markdown("""
+    st.markdown('''
     <div class="modal">
         <div class="modal-content">
             <h2>Welcome to Your Twin Decision Making AI Companion!</h2>
@@ -82,27 +82,27 @@ if not st.session_state.get("onboarding_seen", False):
             document.querySelector('.modal').style.display = 'none';
         }
     </script>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
     st.session_state.onboarding_seen = True
 
 # Step 1: Craft Your Decision-Making Process
 if st.session_state.step == 1:
     st.header("Step 1: Craft Your Decision-Making Process")
-    st.markdown("""
+    st.markdown('''
     <div class="step-info">
         <i class="fas fa-brain step-icon"></i>
         <p>Describe your decision context and the stakeholders or process involved. Your Twin AI Companion will simulate and test your process, providing actionable insights.</p>
     </div>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
     with st.form("input_form"):
-        st.markdown("<h4><i class=\"fas fa-lightbulb\"></i> Decision Context</h4>", unsafe_allow_html=True)
+        st.markdown('<h4><i class="fas fa-lightbulb"></i> Decision Context</h4>', unsafe_allow_html=True)
         dilemma = st.text_area(
             "",
             placeholder="E.g., Allocate $500M for regional stabilization, balancing humanitarian aid, security, and economic growth.",
             height=200,
             help="Describe the decision you face, including goals and constraints (e.g., budget, time, priorities)."
         )
-        st.markdown("<h4><i class="fas fa-users"></i> Process or Stakeholders</h4>", unsafe_allow_html=True)
+        st.markdown('<h4><i class="fas fa-users"></i> Process or Stakeholders</h4>', unsafe_allow_html=True)
         process_hint = st.text_area(
             "",
             placeholder="E.g., Involves a task force with Assistant Secretary, USAID, DoD, and OMB, following a 4-week process.",
@@ -154,14 +154,14 @@ elif st.session_state.step == 3:
     cols = st.columns(3)
     for i, persona in enumerate(st.session_state.personas):
         with cols[i % 3]:
-            st.markdown(f"""
+            st.markdown(f'''
             <div class="persona-card">
                 <h3>{persona['name']}</h3>
                 <p><strong>Goals:</strong> {', '.join(persona['goals'])}</p>
                 <p><strong>Biases:</strong> {', '.join(persona['biases'])}</p>
                 <p><strong>Tone:</strong> {persona['tone'].capitalize()}</p>
             </div>
-            """, unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
     if st.button("Launch Simulation", key="launch_simulation"):
         try:
             with st.spinner("Initiating simulation..."):
@@ -176,16 +176,16 @@ elif st.session_state.step == 3:
 elif st.session_state.step == 4:
     st.header("Step 4: Experience the Debate")
     st.info("Witness your stakeholders debate in real-time. Ready to analyze the results?")
-    st.markdown("<div class='debate-container'>", unsafe_allow_html=True)
+    st.markdown('<div class="debate-container">', unsafe_allow_html=True)
     placeholder = st.empty()
     for entry in st.session_state.transcript:
         with placeholder.container():
             st.markdown(
-                f"<div class='debate-message'><strong>{entry['agent']}:</strong> {entry['message']}</div>",
+                f'<div class="debate-message"><strong>{entry["agent"]}:</strong> {entry["message"]}</div>',
                 unsafe_allow_html=True
             )
         time.sleep(0.5)  # Simulate live typing for immersive effect
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     if st.button("Analyze and Optimize", key="analyze"):
         try:
             with st.spinner("Analyzing debate and generating insights..."):
@@ -213,10 +213,10 @@ elif st.session_state.step == 5:
     st.header("Step 5: Unlock Your Insights")
     st.info("Dive into the simulation results, optimization suggestions, and stunning visualizations.")
     st.markdown("### Decision Summary")
-    st.markdown(f"<div class='summary-box'>{st.session_state.summary}</div>", unsafe_allow_html=True)
+    st.markdown(f'<div class="summary-box">{st.session_state.summary}</div>', unsafe_allow_html=True)
     
     st.markdown("### Optimization Suggestion")
-    st.markdown(f"<div class='suggestion-box'>{st.session_state.suggestion}</div>", unsafe_allow_html=True)
+    st.markdown(f'<div class="suggestion-box">{st.session_state.suggestion}</div>', unsafe_allow_html=True)
     
     st.markdown("### Visual Insights")
     col1, col2 = st.columns(2)
@@ -271,8 +271,8 @@ elif st.session_state.step == 5:
             st.warning("Heatmap unavailable.")
     
     # Call to action
-    st.markdown("""
-    <div class='cta-box'>
+    st.markdown('''
+    <div class="cta-box">
         <h3>Loved the Experience?</h3>
         <p>Share your feedback or start a new simulation to explore more possibilities!</p>
         <button onclick="restartSimulation()">Start New Simulation</button>
@@ -282,4 +282,4 @@ elif st.session_state.step == 5:
             window.location.reload();
         }
     </script>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
