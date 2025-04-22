@@ -207,12 +207,22 @@ elif st.session_state.step == 2:
     st.info("Review the AI-extracted decision type, stakeholders, issues, process steps, and external factors. Edit as needed before generating personas.")
     if st.session_state.extracted:
         with st.form("edit_extraction_form"):
+            # Decision Type Section
             st.markdown("### Decision Type")
+            extracted_decision_type = st.session_state.extracted.get("decision_type", "Other")
+            # Handle cases where decision_type includes annotations like "(Assumed)"
+            base_decision_type = extracted_decision_type.split(" (")[0].strip()
+            # Ensure the base_decision_type exists in DECISION_TYPES, default to "Other" if not
+            if base_decision_type not in DECISION_TYPES:
+                base_decision_type = "Other"
             decision_type = st.selectbox(
                 "Decision Type",
                 options=DECISION_TYPES,
-                index=DECISION_TYPES.index(st.session_state.extracted.get("decision_type", "Other").split(" (")[0])
+                index=DECISION_TYPES.index(base_decision_type),
+                help="The type of decision being made, as extracted by AI."
             )
+
+            # Stakeholders Section with Editable Cards
             st.markdown("### Stakeholders (Editable Cards)")
             st.markdown("""
             <style>
@@ -269,29 +279,40 @@ elif st.session_state.step == 2:
                         "biases": biases,
                         "historical_behavior": history
                     })
+
+            # Issues Section
             st.markdown("### Issues")
             issues = st.text_area(
                 "Issues (one per line)",
                 value="\n".join(st.session_state.extracted.get("issues", [])),
                 height=100
             )
+
+            # Process Steps Section
             st.markdown("### Process Steps")
             process = st.text_area(
                 "Process Steps (one per line)",
                 value="\n".join(st.session_state.extracted.get("process", [])),
                 height=100
             )
+
+            # External Factors Section
             st.markdown("### External Factors")
             external_factors = st.text_area(
                 "External Factors (one per line)",
                 value="\n".join(st.session_state.extracted.get("external_factors", [])),
                 height=100
             )
+
+            # ASCII Visualizations
             st.markdown("### ASCII Process Timeline")
             st.code(st.session_state.extracted.get("ascii_process", "No process visualization available."))
             st.markdown("### ASCII Stakeholder Hierarchy")
             st.code(st.session_state.extracted.get("ascii_stakeholders", "No stakeholder visualization available."))
+
+            # Submit Button
             submit_button = st.form_submit_button("Save and Generate Personas")
+
             if submit_button:
                 try:
                     edited_extracted = {
