@@ -531,24 +531,51 @@ elif st.session_state.step == 5:
     st.markdown(f'<div class="suggestion-box">{st.session_state.suggestion}</div>', unsafe_allow_html=True)
     
     st.markdown("### Visual Insights")
-    col1, col2 = st.columns(2)
-    with col1:
-        try:
-            st.image("visualization.png", caption="Word Cloud of Key Themes", use_column_width=True)
-        except FileNotFoundError:
-            st.warning("Word cloud unavailable.")
-    with col2:
-        try:
-            with open("network_graph.html", "r") as f:
-                html_content = f.read()
-            # Ensure the HTML content is rendered with sufficient height
-            st.components.v1.html(html_content, height=500, scrolling=True)
-            st.caption("Stakeholder Interaction Network")
-        except FileNotFoundError:
-            st.warning("Network graph unavailable. Please ensure the simulation completed successfully.")
+    # Word Cloud
+    st.subheader("Word Cloud of Key Themes")
+    try:
+        st.image("word_cloud.png", use_column_width=True)
+    except FileNotFoundError:
+        st.warning("Word cloud unavailable.")
+
+    # Network Graph
+    st.subheader("Stakeholder Interaction Network")
+    try:
+        with open("network_graph.html", "r") as f:
+            html_content = f.read()
+        st.components.v1.html(html_content, height=500, scrolling=True)
+    except FileNotFoundError:
+        st.warning("Network graph unavailable.")
+
+    # Timeline Chart
+    st.subheader("Stakeholder Priorities Over Rounds")
+    try:
+        with open("timeline_chart.html", "r") as f:
+            html_content = f.read()
+        st.components.v1.html(html_content, height=500, scrolling=True)
+    except FileNotFoundError:
+        st.warning("Timeline chart unavailable.")
+
+    # Sentiment Analysis
+    st.subheader("Sentiment Analysis of Contributions")
+    try:
+        with open("sentiment_chart.html", "r") as f:
+            html_content = f.read()
+        st.components.v1.html(html_content, height=500, scrolling=True)
+    except FileNotFoundError:
+        st.warning("Sentiment chart unavailable.")
+
+    # Topic Modeling
+    st.subheader("Top Terms in Identified Topics")
+    try:
+        with open("topic_modeling_chart.html", "r") as f:
+            html_content = f.read()
+        st.components.v1.html(html_content, height=500, scrolling=True)
+    except FileNotFoundError:
+        st.warning("Topic modeling chart unavailable.")
     
     st.markdown("### Export Your Results")
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
     with col1:
         st.download_button(
             label="📄 Transcript (JSON)",
@@ -565,11 +592,11 @@ elif st.session_state.step == 5:
         )
     with col3:
         try:
-            with open("visualization.png", "rb") as f:
+            with open("word_cloud.png", "rb") as f:
                 st.download_button(
                     label="🖼️ Word Cloud (PNG)",
                     data=f,
-                    file_name="visualization.png",
+                    file_name="word_cloud.png",
                     mime="image/png"
                 )
         except FileNotFoundError:
@@ -585,6 +612,28 @@ elif st.session_state.step == 5:
                 )
         except FileNotFoundError:
             st.warning("Network graph unavailable.")
+    with col5:
+        try:
+            with open("timeline_chart.html", "r") as f:
+                st.download_button(
+                    label="⏳ Timeline Chart (HTML)",
+                    data=f,
+                    file_name="timeline_chart.html",
+                    mime="text/html"
+                )
+        except FileNotFoundError:
+            st.warning("Timeline chart unavailable.")
+    with col6:
+        try:
+            with open("sentiment_chart.html", "r") as f:
+                st.download_button(
+                    label="😊 Sentiment Chart (HTML)",
+                    data=f,
+                    file_name="sentiment_chart.html",
+                    mime="text/html"
+                )
+        except FileNotFoundError:
+            st.warning("Sentiment chart unavailable.")
     
     st.markdown('''
     <div class="cta-box">
@@ -598,3 +647,4 @@ elif st.session_state.step == 5:
         }
     </script>
     ''', unsafe_allow_html=True)
+
