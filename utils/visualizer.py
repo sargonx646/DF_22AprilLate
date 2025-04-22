@@ -1,7 +1,5 @@
 import wordcloud
 import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
 import networkx as nx
 import plotly.graph_objects as go
 from typing import List, Dict
@@ -51,15 +49,13 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
         # Extract edge weights for visualization
         edge_x = []
         edge_y = []
-        edge_weights = []
-        for edge in G.edges(data=True):
+        for edge in G.edges():
             x0, y0 = pos[edge[0]]
             x1, y1 = pos[edge[1]]
             edge_x.extend([x0, x1, None])
             edge_y.extend([y0, y1, None])
-            edge_weights.append(edge[2]["weight"])
 
-        # Create edge trace with weighted lines
+        # Create edge trace
         edge_trace = go.Scatter(
             x=edge_x,
             y=edge_y,
@@ -113,6 +109,6 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
                         )
 
         # Save the figure as an HTML file
-        fig.write_html("network_graph.html")
+        fig.write_html("network_graph.html", include_plotlyjs='cdn')
     except Exception as e:
         print(f"Network Graph Generation Error: {str(e)}")
