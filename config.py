@@ -6,13 +6,14 @@ load_dotenv()
 # OpenRouter API configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "nousresearch/deephermes-3-llama-3-8b-preview:free"
+MODEL_NAME = "xai/grok-3-mini"  # Switched to Grok 3 Mini for better reasoning
 TIMEOUT_S = 15
 MAX_RETRIES = 3
 RETRY_DELAY = 1
+MAX_TOKENS = 2000  # Increased for Grok 3 Mini's capabilities
 
 # Application settings
-MAX_STAKEHOLDERS = 10  # Increased to support up to 10 stakeholders
+MAX_STAKEHOLDERS = 10
 MIN_STAKEHOLDERS = 3
 DEBATE_ROUNDS = 3
 
