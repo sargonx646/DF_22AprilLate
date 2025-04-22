@@ -1,15 +1,25 @@
 import json
 import os
 import time
+import signal
 from openai import OpenAI
 from typing import List, Dict
 from config import DEBATE_ROUNDS, MAX_TOKENS, TIMEOUT_S
 
-def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extracted: Dict, scenarios: str = "", rounds: int = DEBATE_ROUNDS) -> List[Dict]:
+class TimeoutException(Exception):
+    """Custom exception for global simulation timeout."""
+    pass
+
+def timeout_handler(signum, frame):
+    """Handler for global timeout signal."""
+    raise TimeoutException("Simulation exceeded maximum allowed time.")
+
+def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extracted: Dict, scenarios: str = "", rounds: int = DEBATE_ROUNDS, max_simulation_time: int = 120) -> List[Dict]:
     """
     Simulate a human-like, constructive debate among stakeholder personas using xAI's Grok-3-Beta. Each stakeholder is prompted individually
     with tailored instructions based on their role, expertise, and the current round's objectives, ensuring domain-specific and meaningful contributions.
     The simulation dynamically follows the extracted decision-making process, adapting prompts to each round and integrating responses into a transcript.
+    A global timeout ensures the simulation does not exceed the specified maximum time.
 
     Args:
         personas (List[Dict]): List of personas with name, goals, biases, tone, bio, and expected behavior.
@@ -18,10 +28,15 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
         extracted (Dict): Extracted decision structure with process steps and stakeholder roles.
         scenarios (str): Optional alternative scenarios or external factors.
         rounds (int): Number of debate rounds, aligned with process steps.
+        max_simulation_time (int): Maximum allowed time for the entire simulation in seconds (default: 120).
 
     Returns:
         List[Dict]: Debate transcript with agent, round, step, and message.
     """
+    # Set up global timeout
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(max_simulation_time)
+
     client = OpenAI(
         base_url="https://api.x.ai/v1",
         api_key=os.getenv("XAI_API_KEY")
@@ -40,7 +55,12 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
             name, role = line.split(":", 1)
             name = name.strip().split(".")[-1].strip()
             role = role.strip()
-            stakeholder_roles[name] = role
+            # Exclude USAID-related roles
+            if "USAID" not in role:
+                stakeholder_roles[name] = role
+
+    # Filter personas to exclude USAID-related stakeholders
+    filtered_personas = [persona for persona in personas if "USAID" not in stakeholder_roles.get(persona["name"], "")]
 
     # Define role-specific focus areas for prompting
     role_focus = {
@@ -54,16 +74,20 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
         "Marketing Director": "Focus on brand impact, market trends, and customer perception.",
         "Program Manager": "Focus on project feasibility, timelines, and operational challenges.",
         "Field Coordinator": "Focus on on-the-ground realities, urgent needs, and practical implementation.",
-        "Donor Representative": "Focus on alignment with donor priorities, funding constraints, and ROI for donors."
+        "Donor Representative": "Focus on alignment with donor priorities, funding constraints, and ROI for donors.",
+        "Assistant Secretary for the Bureau of East Asian and Pacific Affairs": "Focus on regional stability, diplomatic strategy, and resource allocation across humanitarian, security, and economic priorities.",
+        "Director, Bureau for Humanitarian Assistance - BHA": "Focus on humanitarian crisis response, relief logistics, and immediate life-saving interventions.",
+        "DoD Liaison": "Focus on national security interests, military readiness, and strategic stability.",
+        "Assistant Secretary for the Bureau of Economic and Business Affairs": "Focus on economic growth, infrastructure investments, and long-term regional resilience."
     }
 
     # Define process-step-specific objectives for each round
     process_objectives = {
-        "Data Collection": "Analyze the dilemma and gather relevant data from your perspective. Identify key challenges, risks, and priorities based on your expertise. Provide specific insights or data points that should be considered.",
-        "Stakeholder Mapping": "Identify the priorities and influence of key stakeholders, including yourself, from your perspective. Highlight potential allies, conflicts, or power dynamics that could impact the decision-making process.",
-        "Option Development": "Propose 2–3 actionable options to address the dilemma, emphasizing priorities relevant to your role. Evaluate the pros and cons of each option, considering the data and stakeholder dynamics from previous rounds.",
-        "Impact Analysis": "Evaluate the short- and long-term outcomes of the proposed options from your perspective. Use simulations or reasoning to assess impacts on relevant metrics (e.g., GDP, safety, satisfaction) and identify potential risks or benefits.",
-        "Stakeholder Consultation": "Negotiate trade-offs and propose compromises to align on a final recommendation. Address conflicts from previous rounds, engage with other stakeholders’ proposals, and suggest ways to build consensus."
+        "Situation Assessment": "Analyze the dilemma and gather relevant data from your perspective. Identify key challenges, risks, and priorities based on your expertise. Provide specific insights or data points that should be considered.",
+        "Options Development": "Propose 2–3 actionable options to address the dilemma, emphasizing priorities relevant to your role. Evaluate the pros and cons of each option, considering the data and stakeholder dynamics from previous rounds.",
+        "Interagency Coordination": "Coordinate with other stakeholders to refine options into a cohesive plan. Address conflicts, propose compromises, and ensure alignment across priorities.",
+        "Task Force Deliberation": "Deliberate on the proposed plan, focusing on implementation details, anticipating challenges, and suggesting mitigation strategies.",
+        "Recommendation and Approval": "Finalize the recommendation, justify your stance, and propose next steps for approval and implementation."
     }
 
     # Initialize cumulative context
@@ -72,48 +96,43 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
     if scenarios:
         cumulative_context += f"Alternative Scenarios/External Factors: {scenarios}\n"
 
-    # Simulate debate round by round
-    for round_num in range(rounds):
-        current_step = process_steps[round_num]
-        # Extract the step name for matching with objectives
-        step_key = current_step.split("(")[0].strip()
-        objective = process_objectives.get(step_key, "Continue the discussion, building on prior rounds to finalize the decision from your perspective.")
+    try:
+        # Simulate debate round by round
+        for round_num in range(rounds):
+            current_step = process_steps[round_num]
+            # Extract the step name for matching with objectives
+            step_key = current_step.split("(")[0].strip()
+            objective = process_objectives.get(step_key, "Continue the discussion, building on prior rounds to finalize the decision from your perspective.")
 
-        round_transcript = []
-        # Prompt each stakeholder individually
-        for persona in personas:
-            stakeholder_name = persona["name"]
-            role = stakeholder_roles.get(stakeholder_name, "Team Member")
-            focus_area = role_focus.get(role, "Focus on general contributions to the decision-making process.")
+            round_transcript = []
+            # Prompt each stakeholder individually
+            for persona in filtered_personas:
+                stakeholder_name = persona["name"]
+                role = stakeholder_roles.get(stakeholder_name, "Team Member")
+                focus_area = role_focus.get(role, "Focus on general contributions to the decision-making process.")
 
-            # Tailored prompt for each stakeholder
-            prompt = (
-                f"You are Grok-3-Beta, simulating {stakeholder_name}, with the role of {role}. "
-                f"Your expertise and focus area: {focus_area}\n"
-                "Your characteristics:\n"
-                f"- Goals: {', '.join(persona['goals'])}\n"
-                f"- Biases: {', '.join(persona['biases'])}\n"
-                f"- Tone: {persona['tone']}\n"
-                f"- Bio: {persona['bio']}\n"
-                f"- Expected Behavior: {persona['expected_behavior']}\n"
-                "The debate follows a structured decision-making process, and you are currently in:\n"
-                f"- Step: {current_step} (Round {round_num + 1})\n"
-                f"- Objective: {objective}\n"
-                "You should:\n"
-                "- Contribute a 300–400 word response, deeply tied to the dilemma’s specifics and the current process step, from your role’s perspective.\n"
-                "- Use Chain-of-Thought reasoning: Think step by step about your goals, biases, tone, bio, and expected negotiation behavior before proposing a solution.\n"
-                "- Act proactively, proposing actionable solutions, anticipating challenges, and suggesting innovations within your domain.\n"
-                "- Explicitly reference and build on specific points from the cumulative context, e.g., 'As [Stakeholder X] noted in Round 1 about [point], I propose...' or 'I disagree with [Stakeholder Y]'s suggestion because...'.\n"
-                "- Engage constructively with other stakeholders’ previous arguments, proposing compromises and resolving conflicts.\n"
-                "- Consider alternative scenarios or external factors, if provided, when making proposals.\n"
-                f"Cumulative Context from Previous Rounds (summarized):\n{cumulative_context[:2000]}\n"  # Limit context to avoid token overflow
-                "Return your response as a JSON object with keys 'agent', 'round', 'step', and 'message'."
-            )
+                # Simplified prompt to avoid token limits
+                prompt = (
+                    f"You are Grok-3-Beta, simulating {stakeholder_name}, with the role of {role}. "
+                    f"Your expertise and focus area: {focus_area}\n"
+                    "Your characteristics:\n"
+                    f"- Goals: {', '.join(persona['goals'])}\n"
+                    f"- Biases: {', '.join(persona['biases'])}\n"
+                    f"- Tone: {persona['tone']}\n"
+                    f"- Bio: {persona['bio'][:200]}\n"
+                    f"- Expected Behavior: {persona['expected_behavior'][:100]}\n"
+                    f"Current Step: {current_step} (Round {round_num + 1})\n"
+                    f"Objective: {objective}\n"
+                    "Instructions:\n"
+                    "- Provide a 200–300 word response, focusing on the dilemma and current step, from your role’s perspective.\n"
+                    "- Use Chain-of-Thought reasoning: Consider your goals, biases, tone, and expected behavior.\n"
+                    "- Propose actionable solutions, anticipate challenges, and suggest innovations.\n"
+                    "- Reference the cumulative context, e.g., 'As [Stakeholder X] noted...'\n"
+                    "- Engage constructively, proposing compromises and resolving conflicts.\n"
+                    f"Cumulative Context (summarized):\n{cumulative_context[-1000:]}\n"
+                    "Return your response as a JSON object with keys 'agent', 'round', 'step', and 'message'."
+                )
 
-            # Retry logic with exponential backoff
-            max_retries = 3
-            retry_delay = 1
-            for attempt in range(max_retries):
                 try:
                     completion = client.chat.completions.create(
                         model="grok-3-beta",
@@ -121,59 +140,37 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
                             {"role": "system", "content": "You are an AI assistant simulating a stakeholder in a debate."},
                             {"role": "user", "content": prompt}
                         ],
-                        temperature=0.7,  # Lowered for more consistent output
-                        max_tokens=1000,  # Increased to ensure complete responses
-                        timeout=30  # Explicit timeout
+                        temperature=0.7,
+                        max_tokens=800,
+                        timeout=10
                     )
                     raw_response = completion.choices[0].message.content
-                    try:
-                        response = json.loads(raw_response)
-                        if isinstance(response, dict) and all(key in response for key in ["agent", "round", "step", "message"]):
-                            round_transcript.append(response)
-                        else:
-                            raise ValueError("Invalid JSON structure")
-                    except json.JSONDecodeError as e:
-                        print(f"JSON Decode Error for {stakeholder_name} (Round {round_num + 1}, Attempt {attempt + 1}): {str(e)}")
-                        print(f"Raw Response: {raw_response}")
-                        if attempt == max_retries - 1:
-                            # Enhanced fallback
-                            fallback_message = (
-                                f"As {stakeholder_name}, with the role of {role}, I focus on {focus_area.lower()}. "
-                                f"Given my goal to {persona['goals'][0]} and my {persona['tone']} tone, I emphasize "
-                                f"{objective.lower().split(':')[0]} in {current_step}. Considering my {persona['biases'][0]}, "
-                                f"I would prioritize relevant data or perspectives. Unfortunately, detailed insights could not be generated."
-                            )
-                            round_transcript.append({
-                                "agent": stakeholder_name,
-                                "round": round_num + 1,
-                                "step": current_step,
-                                "message": fallback_message
-                            })
-                    break  # Success, exit retry loop
-                except Exception as e:
-                    print(f"API Error for {stakeholder_name} (Round {round_num + 1}, Attempt {attempt + 1}): {str(e)}")
-                    if attempt < max_retries - 1:
-                        time.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff
+                    response = json.loads(raw_response)
+                    if isinstance(response, dict) and all(key in response for key in ["agent", "round", "step", "message"]):
+                        round_transcript.append(response)
                     else:
-                        # Enhanced fallback
-                        fallback_message = (
-                            f"As {stakeholder_name}, with the role of {role}, I focus on {focus_area.lower()}. "
-                            f"Given my goal to {persona['goals'][0]} and my {persona['tone']} tone, I emphasize "
-                            f"{objective.lower().split(':')[0]} in {current_step}. Considering my {persona['biases'][0]}, "
-                            f"I would prioritize relevant data or perspectives. Unfortunately, detailed insights could not be generated."
-                        )
-                        round_transcript.append({
-                            "agent": stakeholder_name,
-                            "round": round_num + 1,
-                            "step": current_step,
-                            "message": fallback_message
-                        })
+                        raise ValueError("Invalid JSON structure")
+                except Exception as e:
+                    print(f"Error for {stakeholder_name} (Round {round_num + 1}): {str(e)}")
+                    raise  # Let the exception propagate to fail fast since fallback is not needed
 
-        # Add round contributions to transcript and update cumulative context
-        transcript.extend(round_transcript)
-        cumulative_context += f"\nRound {round_num + 1} ({current_step}) Contributions:\n"
-        for entry in round_transcript:
-            cumulative_context += f"- {entry['agent']}: {entry['message']}\n"
+            # Add round contributions to transcript and update cumulative context
+            transcript.extend(round_transcript)
+            cumulative_context += f"\nRound {round_num + 1} ({current_step}) Contributions:\n"
+            for entry in round_transcript:
+                cumulative_context += f"- {entry['agent']}: {entry['message']}\n"
+
+    except TimeoutException:
+        print(f"Simulation interrupted: Exceeded maximum time of {max_simulation_time} seconds.")
+        # Add a note to the transcript
+        if transcript:
+            transcript.append({
+                "agent": "System",
+                "round": round_num + 1 if 'round_num' in locals() else 1,
+                "step": current_step if 'current_step' in locals() else "Unknown",
+                "message": f"Simulation interrupted: Exceeded maximum time of {max_simulation_time} seconds. Results up to this point are provided."
+            })
+    finally:
+        signal.alarm(0)  # Disable the alarm
 
     return transcript
