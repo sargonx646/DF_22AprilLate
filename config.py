@@ -4,7 +4,7 @@ MODEL_NAME = "grok-3-mini-beta"
 TIMEOUT_S = 30
 MAX_RETRIES = 3
 RETRY_DELAY = 2
-MAX_TOKENS = 4000
+MAX_TOKENS = 6000  # Increased for longer debate responses
 
 # Decision-making configuration
 MIN_STAKEHOLDERS = 3
@@ -47,4 +47,4 @@ STAKEHOLDER_ANALYSIS = {
         "Aggressive Expansion"
     ]
 }
-DEBATE_ROUNDS = 3
+DEBATE_ROUNDS = 5  # Increased for longer debates
