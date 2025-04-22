@@ -1,10 +1,10 @@
 # xAI API configuration
 API_URL = "https://api.x.ai/v1"
-MODEL_NAME = "grok-3-beta"  # Updated to grok-3-beta
+MODEL_NAME = "grok-3-beta"
 TIMEOUT_S = 30
 MAX_RETRIES = 3
 RETRY_DELAY = 2
-MAX_TOKENS = 8000  # Increased for richer responses
+MAX_TOKENS = 12000  # Increased for 300–400 word responses per stakeholder
 
 # Decision-making configuration
 MIN_STAKEHOLDERS = 3
