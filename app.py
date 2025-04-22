@@ -13,15 +13,16 @@ from utils.db import init_db, save_simulation
 init_db()
 
 # Streamlit configuration
-st.set_page_config(page_title="DecisionForge", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="Twin Decision Making AI Companion", page_icon="🤖", layout="wide")
 st.markdown('<link rel="stylesheet" href="/static/css/custom.css">', unsafe_allow_html=True)
 st.markdown('<script src="/static/js/animations.js"></script>', unsafe_allow_html=True)
+st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">', unsafe_allow_html=True)
 
 # Custom header with animation
 st.markdown("""
 <div class="header-container">
-    <h1 class="header-title">DecisionForge</h1>
-    <p class="header-subtitle">Unleash Strategic Brilliance with AI-Powered Decision Simulations</p>
+    <h1 class="header-title">Twin Decision Making AI Companion</h1>
+    <p class="header-subtitle">Recreate and Test Your Decision-Making Processes with AI-Powered Simulations</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -38,7 +39,7 @@ if "step" not in st.session_state:
     st.session_state.suggestion = ""
 
 # Sidebar with progress and navigation
-st.sidebar.title("DecisionForge Journey")
+st.sidebar.title("Decision-Making Journey")
 st.sidebar.markdown("Track your simulation progress:")
 progress = st.sidebar.progress(st.session_state.step / 5)
 st.sidebar.markdown(f"**Step {st.session_state.step} of 5**")
@@ -64,13 +65,13 @@ if not st.session_state.get("onboarding_seen", False):
     st.markdown("""
     <div class="modal">
         <div class="modal-content">
-            <h2>Welcome to DecisionForge!</h2>
-            <p>Embark on a journey to transform decision-making. Follow these steps:</p>
+            <h2>Welcome to Your Twin Decision Making AI Companion!</h2>
+            <p>Recreate and test your decision-making processes with AI:</p>
             <ul>
-                <li>Define your budget allocation dilemma.</li>
+                <li>Define your decision context and process.</li>
                 <li>Review AI-extracted stakeholders.</li>
                 <li>Explore dynamic personas.</li>
-                <li>Watch a live AI debate.</li>
+                <li>Simulate stakeholder debates.</li>
                 <li>Unlock insights and optimizations.</li>
             </ul>
             <button onclick="closeModal()">Start Now</button>
@@ -84,38 +85,45 @@ if not st.session_state.get("onboarding_seen", False):
     """, unsafe_allow_html=True)
     st.session_state.onboarding_seen = True
 
-# Step 1: Input Decision Dilemma
+# Step 1: Craft Your Decision-Making Process
 if st.session_state.step == 1:
-    st.header("Step 1: Define Your Budget Allocation Dilemma")
-    st.info("Describe the decision challenge and the stakeholders or process involved. Let AI bring your scenario to life!")
+    st.header("Step 1: Craft Your Decision-Making Process")
+    st.markdown("""
+    <div class="step-info">
+        <i class="fas fa-brain step-icon"></i>
+        <p>Describe your decision context and the stakeholders or process involved. Your Twin AI Companion will simulate and test your process, providing actionable insights.</p>
+    </div>
+    """, unsafe_allow_html=True)
     with st.form("input_form"):
+        st.markdown("<h4><i class="fas fa-lightbulb"></i> Decision Context</h4>", unsafe_allow_html=True)
         dilemma = st.text_area(
-            "Decision Dilemma",
-            placeholder="E.g., Allocate $10M budget across departments",
-            height=150,
-            help="Provide a clear description of the budget allocation challenge."
+            "",
+            placeholder="E.g., Allocate $500M for regional stabilization, balancing humanitarian aid, security, and economic growth.",
+            height=200,
+            help="Describe the decision you face, including goals and constraints (e.g., budget, time, priorities)."
         )
+        st.markdown("<h4><i class="fas fa-users"></i> Process or Stakeholders</h4>", unsafe_allow_html=True)
         process_hint = st.text_area(
-            "Process or Stakeholders",
-            placeholder="E.g., Involves CEO, CFO, HR, and department heads",
-            height=150,
-            help="Detail the decision-making process or key participants."
+            "",
+            placeholder="E.g., Involves a task force with Assistant Secretary, USAID, DoD, and OMB, following a 4-week process.",
+            height=200,
+            help="Detail the decision-making process (steps, timeline) and/or key stakeholders (names, roles, priorities)."
         )
-        submitted = st.form_submit_button("Extract Structure")
+        submitted = st.form_submit_button("Extract Decision Structure")
         if submitted:
             if not dilemma.strip() or not process_hint.strip():
-                st.error("Please provide both a dilemma and process details.")
+                st.error("Please provide both a decision context and process/stakeholder details.")
             else:
                 try:
-                    with st.spinner("Extracting decision structure..."):
+                    with st.spinner("Analyzing your decision process..."):
                         st.session_state.dilemma = dilemma
                         st.session_state.process_hint = process_hint
                         st.session_state.extracted = extract_info(dilemma, process_hint)
                     st.session_state.step = 2
-                    st.success("Structure extracted successfully!")
+                    st.success("Decision structure extracted successfully!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Oops! Extraction failed: {str(e)}")
+                    st.error(f"Failed to extract structure: {str(e)}. Please check your input or try again.")
 
 # Step 2: Review Extracted Structure
 elif st.session_state.step == 2:
@@ -126,8 +134,8 @@ elif st.session_state.step == 2:
         if st.button("Generate Personas", key="generate_personas"):
             try:
                 stakeholders = st.session_state.extracted.get("stakeholders", [])
-                if not stakeholders or len(stakeholders) < 3 or len(stakeholders) > 7:
-                    st.error("The simulation requires 3–7 stakeholders.")
+                if not stakeholders or len(stakeholders) < 3 or len(stakeholders) > 8:
+                    st.error("The simulation requires 3–8 stakeholders.")
                 else:
                     with st.spinner("Crafting stakeholder personas..."):
                         st.session_state.personas = build_personas(stakeholders)
