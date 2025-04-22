@@ -178,13 +178,24 @@ Stakeholder Dynamics:
     }
 ]
 
-# Custom header with animation
+# Custom header with images and description
 st.markdown('''
 <div class="header-container">
     <h1 class="header-title">Twin Decision Making AI Companion</h1>
     <p class="header-subtitle">Recreate and Test Your Decision-Making Processes with AI-Powered Simulations</p>
 </div>
 ''', unsafe_allow_html=True)
+
+# Add DecisionForge images and description
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    # Use raw GitHub URLs for the images (replace with your actual URLs after uploading)
+    st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/geometric_shape.png", width=100)
+    st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/decisionforge_logo.png", width=300)
+    st.markdown("""
+    **DecisionForge: Shape the Future of Decisions**  
+    DecisionForge empowers leaders to forge impactful strategies through AI-driven simulations. By recreating complex decision environments, it illuminates stakeholder dynamics, uncovers hidden insights, and drives optimal outcomes—transforming challenges into opportunities with precision and clarity.
+    """)
 
 # Initialize session state
 if "step" not in st.session_state:
@@ -307,42 +318,56 @@ elif st.session_state.step == 2:
                 options=DECISION_TYPES,
                 index=DECISION_TYPES.index(st.session_state.extracted.get("decision_type", "Other"))
             )
-            st.markdown("### Stakeholders")
+            st.markdown("### Stakeholders (Editable Cards)")
+            st.markdown("""
+            <style>
+            .stakeholder-card {
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                margin-bottom: 15px;
+            }
+            .stakeholder-card input {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            cols = st.columns(4)  # 4 cards per row
             stakeholders = []
             for i, s in enumerate(st.session_state.extracted.get("stakeholders", [])):
-                st.markdown(f"#### Stakeholder {i+1}")
-                name = st.text_input(f"Name {i+1}", value=s.get("name", ""), key=f"stakeholder_name_{i}")
-                traits = st.selectbox(
-                    f"Psychological Traits {i+1}",
-                    options=STAKEHOLDER_ANALYSIS['psychological_traits'],
-                    index=STAKEHOLDER_ANALYSIS['psychological_traits'].index(s.get("psychological_traits", STAKEHOLDER_ANALYSIS['psychological_traits'][0])),
-                    key=f"stakeholder_traits_{i}"
-                )
-                influences = st.selectbox(
-                    f"Influences {i+1}",
-                    options=STAKEHOLDER_ANALYSIS['influences'],
-                    index=STAKEHOLDER_ANALYSIS['influences'].index(s.get("influences", STAKEHOLDER_ANALYSIS['influences'][0])),
-                    key=f"stakeholder_influences_{i}"
-                )
-                biases = st.selectbox(
-                    f"Biases {i+1}",
-                    options=STAKEHOLDER_ANALYSIS['biases'],
-                    index=STAKEHOLDER_ANALYSIS['biases'].index(s.get("biases", STAKEHOLDER_ANALYSIS['biases'][0])),
-                    key=f"stakeholder_biases_{i}"
-                )
-                history = st.selectbox(
-                    f"Historical Behavior {i+1}",
-                    options=STAKEHOLDER_ANALYSIS['historical_behavior'],
-                    index=STAKEHOLDER_ANALYSIS['historical_behavior'].index(s.get("historical_behavior", STAKEHOLDER_ANALYSIS['historical_behavior'][0])),
-                    key=f"stakeholder_history_{i}"
-                )
-                stakeholders.append({
-                    "name": name,
-                    "psychological_traits": traits,
-                    "influences": influences,
-                    "biases": biases,
-                    "historical_behavior": history
-                })
+                with cols[i % 4]:
+                    st.markdown(f'<div class="stakeholder-card">', unsafe_allow_html=True)
+                    name = st.text_input(f"Name", value=s.get("name", ""), key=f"stakeholder_name_{i}")
+                    traits = st.text_input(
+                        f"Psychological Traits (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['psychological_traits'])})",
+                        value=s.get("psychological_traits", ""),
+                        key=f"stakeholder_traits_{i}"
+                    )
+                    influences = st.text_input(
+                        f"Influences (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['influences'])})",
+                        value=s.get("influences", ""),
+                        key=f"stakeholder_influences_{i}"
+                    )
+                    biases = st.text_input(
+                        f"Biases (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['biases'])})",
+                        value=s.get("biases", ""),
+                        key=f"stakeholder_biases_{i}"
+                    )
+                    history = st.text_input(
+                        f"Historical Behavior (Suggestions: {', '.join(STAKEHOLDER_ANALYSIS['historical_behavior'])})",
+                        value=s.get("historical_behavior", ""),
+                        key=f"stakeholder_history_{i}"
+                    )
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    stakeholders.append({
+                        "name": name,
+                        "psychological_traits": traits,
+                        "influences": influences,
+                        "biases": biases,
+                        "historical_behavior": history
+                    })
             st.markdown("### Issues")
             issues = st.text_area(
                 "Issues (one per line)",
@@ -416,12 +441,24 @@ elif st.session_state.step == 3:
                 st.success(f"Persona {name} updated!")
     
     st.markdown("### Current Personas")
+    # Extract stakeholder titles from process_hint
+    stakeholder_titles = {}
+    for line in st.session_state.process_hint.split("\n"):
+        if ":" in line and any(s["name"] in line for s in st.session_state.extracted.get("stakeholders", [])):
+            name, title = line.split(":", 1)
+            name = name.strip().split(".")[-1].strip()
+            title = title.strip()
+            stakeholder_titles[name] = title
+    
     cols = st.columns(3)
     for i, persona in enumerate(st.session_state.personas):
         with cols[i % 3]:
+            title = stakeholder_titles.get(persona["name"], "Unknown Role")
+            emoji = "🌐" if "EAP" in title else "🩺" if "BHA" in title else "🛡️" if "DoD" in title else "💼" if "EB" in title else "🤝" if "USAID" in title else "📊" if "OMB" in title else "🏛️" if "Senate" in title else "👤"
             st.markdown(f'''
             <div class="persona-card">
                 <h3>{persona['name']}</h3>
+                <p><strong>Title:</strong> {title} {emoji}</p>
                 <p><strong>Goals:</strong> {', '.join(persona['goals'])}</p>
                 <p><strong>Biases:</strong> {', '.join(persona['biases'])}</p>
                 <p><strong>Tone:</strong> {persona['tone'].capitalize()}</p>
@@ -480,6 +517,13 @@ elif st.session_state.step == 4:
         text-align: center;
         transition: transform 0.3s ease;
     }
+    .debate-window {
+        position: relative;
+        width: 100%;
+        height: 200px;
+        overflow: hidden;
+        margin-top: 20px;
+    }
     .speech-bubble {
         position: absolute;
         background-color: rgba(255, 255, 255, 0.9);
@@ -490,11 +534,12 @@ elif st.session_state.step == 4:
         font-size: 14px;
         animation: fadeInOut 3s ease-in-out;
         z-index: 10;
+        opacity: 0.8;
     }
     @keyframes fadeInOut {
         0% { opacity: 0; transform: translateY(20px); }
-        10% { opacity: 1; transform: translateY(0); }
-        90% { opacity: 1; transform: translateY(0); }
+        10% { opacity: 0.8; transform: translateY(0); }
+        90% { opacity: 0.8; transform: translateY(0); }
         100% { opacity: 0; transform: translateY(-20px); }
     }
     </style>
@@ -511,28 +556,36 @@ elif st.session_state.step == 4:
     agent_positions = {}
     for i, agent in enumerate(agents):
         angle = (2 * 3.14159 * i) / num_agents
-        x = 50 + radius * random.uniform(0.8, 1.2) * (1 if random.random() > 0.5 else -1)  # Randomize x
-        y = 50 + radius * random.uniform(0.8, 1.2) * (1 if random.random() > 0.5 else -1)  # Randomize y
+        x = 50 + radius * random.uniform(0.8, 1.2) * (1 if random.random() > 0.5 else -1)
+        y = 50 + radius * random.uniform(0.8, 1.2) * (1 if random.random() > 0.5 else -1)
         agent_positions[agent] = (x, y)
     
-    # Display debate with animated speech bubbles
-    for entry in st.session_state.transcript:
+    # Display debate with animated speech bubbles in a fixed window
+    st.markdown('<div class="debate-window">', unsafe_allow_html=True)
+    debate_placeholder = st.empty()
+    bubble_positions = []  # Track positions to overlap
+    for i, entry in enumerate(st.session_state.transcript):
         agent = entry["agent"]
         message = entry["message"]
         x, y = agent_positions[agent]
+        
+        # Adjust bubble position to stay within the window and overlap
+        bubble_y = (i % 4) * 50  # Stack bubbles vertically, 4 per cycle
+        bubble_x = random.randint(10, 70)  # Randomize horizontal position within window
         
         # Generate HTML for the roundtable and speech bubble
         html_content = '<div class="roundtable">'
         for a, (ax, ay) in agent_positions.items():
             active = "background-color: #ff6b6b;" if a == agent else ""
             html_content += f'<div class="agent" style="{active} left: {ax}%; top: {ay}%;">{a}</div>'
-        html_content += f'<div class="speech-bubble" style="left: {x + 10}%; top: {y - 20}%;">{agent}: {message}</div>'
         html_content += '</div>'
+        html_content += f'<div class="speech-bubble" style="left: {bubble_x}%; top: {bubble_y}px;">{agent}: {message}</div>'
         
-        with placeholder.container():
+        with debate_placeholder.container():
             st.markdown(html_content, unsafe_allow_html=True)
         time.sleep(0.3)  # Fast pacing for dynamic feel
     
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     if st.button("Analyze and Optimize", key="analyze"):
