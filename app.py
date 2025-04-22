@@ -430,7 +430,12 @@ elif st.session_state.step == 3:
     if st.button("Launch Simulation", key="launch_simulation"):
         try:
             with st.spinner("Initiating simulation..."):
-                st.session_state.transcript = simulate_debate(st.session_state.personas)
+                st.session_state.transcript = simulate_debate(
+                    personas=st.session_state.personas,
+                    dilemma=st.session_state.dilemma,
+                    process_hint=st.session_state.process_hint,
+                    extracted=st.session_state.extracted
+                )
             st.session_state.step = 4
             st.success("Simulation complete! Watch the debate unfold.")
             st.rerun()
@@ -440,17 +445,96 @@ elif st.session_state.step == 3:
 # Step 4: View Simulation
 elif st.session_state.step == 4:
     st.header("Step 4: Experience the Debate")
-    st.info("Witness your stakeholders debate in real-time. Ready to analyze the results?")
+    st.info("Witness your stakeholders debate in real-time around a virtual roundtable. Ready to analyze the results?")
+    
+    # Custom CSS for roundtable visualization
+    st.markdown('''
+    <style>
+    .debate-container {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        position: relative;
+        min-height: 400px;
+        overflow: hidden;
+    }
+    .roundtable {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        height: 200px;
+    }
+    .agent {
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background-color: #007bff;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+    .speech-bubble {
+        position: absolute;
+        background-color: rgba(255, 255, 255, 0.9);
+        border: 2px solid #007bff;
+        border-radius: 10px;
+        padding: 10px;
+        max-width: 300px;
+        font-size: 14px;
+        animation: fadeInOut 3s ease-in-out;
+        z-index: 10;
+    }
+    @keyframes fadeInOut {
+        0% { opacity: 0; transform: translateY(20px); }
+        10% { opacity: 1; transform: translateY(0); }
+        90% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-20px); }
+    }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    # Roundtable visualization
     st.markdown('<div class="debate-container">', unsafe_allow_html=True)
     placeholder = st.empty()
+    
+    # Position agents around a virtual roundtable
+    agents = list(set(entry["agent"] for entry in st.session_state.transcript))
+    num_agents = len(agents)
+    radius = 100  # Radius of the roundtable in pixels
+    agent_positions = {}
+    for i, agent in enumerate(agents):
+        angle = (2 * 3.14159 * i) / num_agents
+        x = 50 + radius * random.uniform(0.8, 1.2) * (1 if random.random() > 0.5 else -1)  # Randomize x
+        y = 50 + radius * random.uniform(0.8, 1.2) * (1 if random.random() > 0.5 else -1)  # Randomize y
+        agent_positions[agent] = (x, y)
+    
+    # Display debate with animated speech bubbles
     for entry in st.session_state.transcript:
+        agent = entry["agent"]
+        message = entry["message"]
+        x, y = agent_positions[agent]
+        
+        # Generate HTML for the roundtable and speech bubble
+        html_content = '<div class="roundtable">'
+        for a, (ax, ay) in agent_positions.items():
+            active = "background-color: #ff6b6b;" if a == agent else ""
+            html_content += f'<div class="agent" style="{active} left: {ax}%; top: {ay}%;">{a}</div>'
+        html_content += f'<div class="speech-bubble" style="left: {x + 10}%; top: {y - 20}%;">{agent}: {message}</div>'
+        html_content += '</div>'
+        
         with placeholder.container():
-            st.markdown(
-                f'<div class="debate-message"><strong>{entry["agent"]}:</strong> {entry["message"]}</div>',
-                unsafe_allow_html=True
-            )
-        time.sleep(0.5)
+            st.markdown(html_content, unsafe_allow_html=True)
+        time.sleep(0.3)  # Fast pacing for dynamic feel
+    
     st.markdown('</div>', unsafe_allow_html=True)
+    
     if st.button("Analyze and Optimize", key="analyze"):
         try:
             with st.spinner("Analyzing debate and generating insights..."):
