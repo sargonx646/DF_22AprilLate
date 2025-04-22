@@ -95,7 +95,7 @@ if st.session_state.step == 1:
     </div>
     """, unsafe_allow_html=True)
     with st.form("input_form"):
-        st.markdown("<h4><i class="fas fa-lightbulb"></i> Decision Context</h4>", unsafe_allow_html=True)
+        st.markdown("<h4><i class=\"fas fa-lightbulb\"></i> Decision Context</h4>", unsafe_allow_html=True)
         dilemma = st.text_area(
             "",
             placeholder="E.g., Allocate $500M for regional stabilization, balancing humanitarian aid, security, and economic growth.",
