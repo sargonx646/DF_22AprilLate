@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from openai import OpenAI
 from typing import List, Dict
 from config import DEBATE_ROUNDS, MAX_TOKENS, TIMEOUT_S
@@ -8,7 +9,7 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
     """
     Simulate a human-like, constructive debate among stakeholder personas using xAI's Grok-3-Beta. Each stakeholder is prompted individually
     with tailored instructions based on their role, expertise, and the current round's objectives, ensuring domain-specific and meaningful contributions.
-    The simulation aligns with the extracted decision-making process, dynamically adapting prompts to each round and integrating responses into a transcript.
+    The simulation dynamically follows the extracted decision-making process, adapting prompts to each round and integrating responses into a transcript.
 
     Args:
         personas (List[Dict]): List of personas with name, goals, biases, tone, bio, and expected behavior.
@@ -56,14 +57,14 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
         "Donor Representative": "Focus on alignment with donor priorities, funding constraints, and ROI for donors."
     }
 
-    # Define round-specific objectives aligned with the decision-making process
-    round_objectives = [
-        "Assess the situation: Identify key challenges, priorities, and risks related to the dilemma from your perspective. Provide insights based on your expertise.",
-        "Develop options: Propose 2–3 actionable options to address the challenges identified in Round 1. Evaluate their pros and cons from your domain’s perspective.",
-        "Coordinate and collaborate: Review the options proposed in Round 2. Suggest ways to align on a preferred option, addressing any conflicts or concerns from your expertise.",
-        "Deliberate as a group: Discuss the implementation details of the chosen option from Round 3. Anticipate challenges and propose mitigation strategies based on your role.",
-        "Finalize and recommend: Agree on a final recommendation based on Round 4 discussions. Justify your stance and propose next steps from your perspective."
-    ]
+    # Define process-step-specific objectives for each round
+    process_objectives = {
+        "Data Collection": "Analyze the dilemma and gather relevant data from your perspective. Identify key challenges, risks, and priorities based on your expertise. Provide specific insights or data points that should be considered.",
+        "Stakeholder Mapping": "Identify the priorities and influence of key stakeholders, including yourself, from your perspective. Highlight potential allies, conflicts, or power dynamics that could impact the decision-making process.",
+        "Option Development": "Propose 2–3 actionable options to address the dilemma, emphasizing priorities relevant to your role. Evaluate the pros and cons of each option, considering the data and stakeholder dynamics from previous rounds.",
+        "Impact Analysis": "Evaluate the short- and long-term outcomes of the proposed options from your perspective. Use simulations or reasoning to assess impacts on relevant metrics (e.g., GDP, safety, satisfaction) and identify potential risks or benefits.",
+        "Stakeholder Consultation": "Negotiate trade-offs and propose compromises to align on a final recommendation. Address conflicts from previous rounds, engage with other stakeholders’ proposals, and suggest ways to build consensus."
+    }
 
     # Initialize cumulative context
     cumulative_context = "Initial Context: The debate begins with the following dilemma and process.\n"
@@ -74,7 +75,9 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
     # Simulate debate round by round
     for round_num in range(rounds):
         current_step = process_steps[round_num]
-        objective = round_objectives[round_num] if round_num < len(round_objectives) else "Continue the discussion, building on prior rounds to finalize the decision from your perspective."
+        # Extract the step name for matching with objectives (e.g., "Data Collection" from "Data Collection (Week 1): ...")
+        step_key = current_step.split("(")[0].strip()
+        objective = process_objectives.get(step_key, "Continue the discussion, building on prior rounds to finalize the decision from your perspective.")
 
         round_transcript = []
         # Prompt each stakeholder individually
@@ -88,7 +91,13 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
                 "You are Grok-3-Beta, simulating a stakeholder in a human-like, constructive debate for DecisionTwin. "
                 f"You are acting as {stakeholder_name}, with the role of {role}. "
                 f"Your expertise and focus area: {focus_area}\n"
-                f"The debate follows a structured decision-making process, and you are currently in:\n"
+                "Your characteristics:\n"
+                f"- Goals: {', '.join(persona['goals'])}\n"
+                f"- Biases: {', '.join(persona['biases'])}\n"
+                f"- Tone: {persona['tone']}\n"
+                f"- Bio: {persona['bio']}\n"
+                f"- Expected Behavior: {persona['expected_behavior']}\n"
+                "The debate follows a structured decision-making process, and you are currently in:\n"
                 f"- Step: {current_step} (Round {round_num + 1})\n"
                 f"- Objective: {objective}\n"
                 "You should:\n"
@@ -99,40 +108,48 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
                 "- Engage constructively with other stakeholders’ previous arguments, proposing compromises and resolving conflicts.\n"
                 "- Consider alternative scenarios or external factors, if provided, when making proposals.\n"
                 f"Cumulative Context from Previous Rounds:\n{cumulative_context}\n"
-                f"Your Profile:\n{json.dumps(persona, indent=2)}\n"
                 "Return your response as a single string, representing your statement for this round."
             )
 
-            try:
-                completion = client.chat.completions.create(
-                    model="grok-3-beta",
-                    reasoning_effort="high",
-                    messages=[
-                        {"role": "system", "content": "You are an AI assistant simulating a stakeholder in a debate."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.8,
-                    max_tokens=MAX_TOKENS
-                )
-                message = completion.choices[0].message.content.strip()
-                if not message:
-                    raise ValueError("Empty response received.")
+            # Retry logic for API calls
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    completion = client.chat.completions.create(
+                        model="grok-3-beta",
+                        reasoning_effort="high",
+                        messages=[
+                            {"role": "system", "content": "You are an AI assistant simulating a stakeholder in a debate."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.8,
+                        max_tokens=MAX_TOKENS,
+                        timeout=TIMEOUT_S
+                    )
+                    message = completion.choices[0].message.content.strip()
+                    if not message:
+                        raise ValueError("Empty response received.")
+                    break  # Successful response, exit retry loop
+                except Exception as e:
+                    print(f"Attempt {attempt + 1} failed for {stakeholder_name} (Round {round_num + 1}): {str(e)}")
+                    if attempt == max_retries - 1:  # Last attempt failed
+                        # Enhanced fallback response
+                        message = (
+                            f"As {stakeholder_name}, with the role of {role}, I approach this step with a focus on {focus_area.lower()}. "
+                            f"Given my goal to {persona['goals'][0]} and my {persona['tone']} tone, I would emphasize the importance of "
+                            f"considering {persona['goals'][0]} in {current_step}. Based on my {persona['biases'][0]}, I might prioritize "
+                            f"data or perspectives that align with this goal. However, detailed insights could not be generated due to a persistent error."
+                        )
+                    else:
+                        time.sleep(1)  # Wait before retrying
+                        continue
 
-                round_transcript.append({
-                    "agent": stakeholder_name,
-                    "round": round_num + 1,
-                    "step": current_step,
-                    "message": message
-                })
-
-            except Exception as e:
-                print(f"Debate API Error for {stakeholder_name} (Round {round_num + 1}): {str(e)}")
-                round_transcript.append({
-                    "agent": stakeholder_name,
-                    "round": round_num + 1,
-                    "step": current_step,
-                    "message": f"{stakeholder_name} proposes focusing on {persona['goals'][0]} in a {persona['tone']} tone during {current_step}, but detailed insights could not be generated due to an error."
-                })
+            round_transcript.append({
+                "agent": stakeholder_name,
+                "round": round_num + 1,
+                "step": current_step,
+                "message": message
+            })
 
         # Add round contributions to transcript and update cumulative context
         transcript.extend(round_transcript)
