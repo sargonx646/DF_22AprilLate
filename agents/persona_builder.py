@@ -1,71 +1,89 @@
+from typing import List
+import random
 import os
 from openai import OpenAI
-from typing import List, Dict
 
-def build_personas(stakeholder_names: List[str]) -> List[Dict]:
+def build_personas(names: List[str], dilemma: str, process_hint: str) -> List[dict]:
     """
-    Generate detailed personas for stakeholders using xAI's Grok-3-Mini-Beta model.
-    
+    Build detailed personas for stakeholders, including AI-generated bios and expected negotiation behaviors,
+    based on the user-provided case details.
+
     Args:
-        stakeholder_names (List[str]): List of stakeholder names.
-    
+        names (List[str]): List of stakeholder names.
+        dilemma (str): The user-provided decision dilemma.
+        process_hint (str): The user-provided process and stakeholder details.
+
     Returns:
-        List[Dict]: List of personas with name, goals, biases, and tone.
+        List[dict]: List of personas with name, goals, biases, tone, bio, and expected behavior.
     """
-    # Initialize xAI API client
     client = OpenAI(
         base_url="https://api.x.ai/v1",
-        api_key="xai-RXSTGBf9LckPtkQ6aBySC0LmpdIjqq9fSSK49PcdRvpLHmldwXEuPwlK9n9AsNfXsHps86amuUFE053u"
+        api_key=os.getenv("XAI_API_KEY")
     )
-    
+
+    # Sample attributes for persona generation (as fallback if extraction fails)
+    goals_options = [
+        "maximize impact",
+        "ensure stability",
+        "promote growth",
+        "maintain oversight",
+        "enhance influence",
+        "secure resources",
+        "minimize risks"
+    ]
+    biases_options = [
+        "confirmation bias",
+        "optimism bias",
+        "groupthink",
+        "status quo bias",
+        "cost-avoidance bias"
+    ]
+    tones = ["diplomatic", "assertive", "empathetic", "analytical", "cautious"]
+
     personas = []
-    for name in stakeholder_names:
+    for name in names:
+        # Basic persona attributes (will be refined by AI)
+        goals = random.sample(goals_options, k=2)
+        biases = random.sample(biases_options, k=2)
+        tone = random.choice(tones)
+
+        # AI-generated Bio and Expected Behavior based on user input
+        prompt = (
+            f"Generate a detailed bio (150–200 words) and expected negotiation behavior (100–150 words) for a stakeholder named {name}. "
+            f"The stakeholder is part of a decision-making process described as follows:\n"
+            f"Dilemma: {dilemma}\n"
+            f"Process and Stakeholder Details: {process_hint}\n"
+            "Infer the stakeholder's role, priorities, career history, personality, and motivations from the provided dilemma and process details. "
+            "For example, if the process mentions a role like 'Assistant Secretary, EAP,' infer their focus on regional strategy; if it mentions 'USAID Coordinator,' infer a focus on aid effectiveness. "
+            "Incorporate any stakeholder dynamics or conflicts mentioned in the process hint. "
+            "For the bio, detail their professional background, key achievements, and personal traits. "
+            "For the expected behavior, describe how they’ll negotiate, referencing their goals, biases, tone, and the case specifics (e.g., budget constraints, competing priorities)."
+        )
+
         try:
-            # Craft prompt for persona generation
-            messages = [
-                {
-                    "role": "system",
-                    "content": "You are a highly intelligent AI assistant skilled in creating detailed stakeholder personas for decision-making simulations. Generate a persona with goals, biases, and tone based on the provided stakeholder name."
-                },
-                {
-                    "role": "user",
-                    "content": f"Create a persona for a stakeholder named '{name}'. Provide 2-3 goals (specific to their role in a decision-making context), 2-3 biases (cognitive or situational), and a communication tone (e.g., assertive, diplomatic). Return the response in JSON format."
-                }
-            ]
-            
-            # Make API call with reasoning enabled
             completion = client.chat.completions.create(
-                model="grok-3-mini-beta",
-                reasoning_effort="high",
-                messages=messages,
+                model="grok-3-beta",
+                messages=[
+                    {"role": "system", "content": "You are an AI assistant generating detailed stakeholder profiles."},
+                    {"role": "user", "content": prompt}
+                ],
                 temperature=0.7,
-                response_format={"type": "json_object"}
+                max_tokens=800
             )
-            
-            # Parse response
-            persona_data = json.loads(completion.choices[0].message.content)
-            
-            # Ensure required fields
-            persona = {
-                "name": name,
-                "goals": persona_data.get("goals", ["Influence decision outcome", "Protect personal interests"]),
-                "biases": persona_data.get("biases", ["Confirmation bias", "Status quo bias"]),
-                "tone": persona_data.get("tone", "diplomatic")
-            }
-            
-            # Log reasoning for debugging
-            print(f"Persona Reasoning for {name}: {completion.choices[0].message.reasoning_content}")
-            
-            personas.append(persona)
-            
+            response = completion.choices[0].message.content
+            bio, behavior = response.split("\n\n", 1)  # Split bio and behavior
         except Exception as e:
-            print(f"Error generating persona for {name}: {str(e)}")
-            # Fallback persona
-            personas.append({
-                "name": name,
-                "goals": ["Influence decision outcome", "Protect personal interests"],
-                "biases": ["Confirmation bias", "Status quo bias"],
-                "tone": "diplomatic"
-            })
-    
+            print(f"Error generating profile for {name}: {str(e)}")
+            bio = f"{name} has a long career in their field, with extensive experience relevant to the decision at hand. They are known for their dedication and strategic thinking."
+            behavior = f"During negotiations, {name} will focus on their primary goals, advocating strongly with a {tone} tone, while being mindful of their biases."
+
+        personas.append({
+            "name": name,
+            "goals": goals,
+            "biases": biases,
+            "tone": tone,
+            "bio": bio.strip(),
+            "expected_behavior": behavior.strip()
+        })
+
     return personas
