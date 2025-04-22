@@ -47,7 +47,7 @@ if "step" not in st.session_state:
     st.session_state.suggestion = ""
 
 # Sidebar with progress and navigation
-st.sidebar.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/geometric_shape.png", width=100)
+st.sidebar.image("https://raw.githubusercontent.com/sargonx646/DF_22AprilLate/refs/heads/main/assets/geometric_shape.png.png", width=100)
 st.sidebar.title("Decision-Making Journey")
 st.sidebar.markdown("Track your simulation progress:")
 progress = st.sidebar.progress(st.session_state.step / 5)
