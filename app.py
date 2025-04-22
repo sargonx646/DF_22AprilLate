@@ -3,7 +3,7 @@ import json
 import time
 import random
 from streamlit.components.v1 import html
-from agents.extractor import extract_info
+from agents.extractor import extract_info, generate_ascii_process, generate_ascii_stakeholders
 from agents.persona_builder import build_personas
 from agents.debater import simulate_debate
 from agents.summarizer import summarize_and_analyze
