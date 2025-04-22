@@ -189,9 +189,8 @@ st.markdown('''
 # Add DecisionForge images and description
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    # Use raw GitHub URLs for the images (replace with your actual URLs after uploading)
-    st.image("https://raw.githubusercontent.com/sargonx646/DF_22AprilLate/refs/heads/main/assets/geometric_shape.png", width=100)
-    st.image("https://raw.githubusercontent.com/sargonx646/DF_22AprilLate/refs/heads/main/assets/decisionforge_logo.png", width=300)
+    st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/geometric_shape.png", width=100)
+    st.image("https://raw.githubusercontent.com/your-username/df_22aprillate/main/assets/decisionforge_logo.png", width=300)
     st.markdown("""
     **DecisionForge: Shape the Future of Decisions**  
     DecisionForge empowers leaders to forge impactful strategies through AI-driven simulations. By recreating complex decision environments, it illuminates stakeholder dynamics, uncovers hidden insights, and drives optimal outcomes—transforming challenges into opportunities with precision and clarity.
@@ -441,7 +440,6 @@ elif st.session_state.step == 3:
                 st.success(f"Persona {name} updated!")
     
     st.markdown("### Current Personas")
-    # Extract stakeholder titles from process_hint
     stakeholder_titles = {}
     for line in st.session_state.process_hint.split("\n"):
         if ":" in line and any(s["name"] in line for s in st.session_state.extracted.get("stakeholders", [])):
@@ -482,7 +480,7 @@ elif st.session_state.step == 3:
 # Step 4: View Simulation
 elif st.session_state.step == 4:
     st.header("Step 4: Experience the Debate")
-    st.info("Witness your stakeholders debate in real-time around a virtual roundtable. Ready to analyze the results?")
+    st.info("Witness your stakeholders debate in real-time, following the decision-making process. Ready to analyze the results?")
     
     # Custom CSS for roundtable visualization
     st.markdown('''
@@ -520,21 +518,25 @@ elif st.session_state.step == 4:
     .debate-window {
         position: relative;
         width: 100%;
-        height: 200px;
-        overflow: hidden;
+        height: 400px;
+        overflow-y: auto;
         margin-top: 20px;
+        padding: 10px;
+        background-color: #fff;
+        border: 1px solid #ddd;
+        border-radius: 5px;
     }
     .speech-bubble {
-        position: absolute;
         background-color: rgba(255, 255, 255, 0.9);
         border: 2px solid #007bff;
         border-radius: 10px;
-        padding: 10px;
-        max-width: 300px;
+        padding: 15px;
+        margin-bottom: 15px;
         font-size: 14px;
-        animation: fadeInOut 3s ease-in-out;
+        animation: fadeInOut 5s ease-in-out;
         z-index: 10;
         opacity: 0.8;
+        line-height: 1.5;
     }
     @keyframes fadeInOut {
         0% { opacity: 0; transform: translateY(20px); }
@@ -552,7 +554,7 @@ elif st.session_state.step == 4:
     # Position agents around a virtual roundtable
     agents = list(set(entry["agent"] for entry in st.session_state.transcript))
     num_agents = len(agents)
-    radius = 100  # Radius of the roundtable in pixels
+    radius = 100
     agent_positions = {}
     for i, agent in enumerate(agents):
         angle = (2 * 3.14159 * i) / num_agents
@@ -560,18 +562,20 @@ elif st.session_state.step == 4:
         y = 50 + radius * random.uniform(0.8, 1.2) * (1 if random.random() > 0.5 else -1)
         agent_positions[agent] = (x, y)
     
-    # Display debate with animated speech bubbles in a fixed window
+    # Display debate with round and step information
     st.markdown('<div class="debate-window">', unsafe_allow_html=True)
     debate_placeholder = st.empty()
-    bubble_positions = []  # Track positions to overlap
-    for i, entry in enumerate(st.session_state.transcript):
+    current_round = None
+    for entry in st.session_state.transcript:
         agent = entry["agent"]
         message = entry["message"]
-        x, y = agent_positions[agent]
+        round_num = entry["round"]
+        step = entry["step"]
         
-        # Adjust bubble position to stay within the window and overlap
-        bubble_y = (i % 4) * 50  # Stack bubbles vertically, 4 per cycle
-        bubble_x = random.randint(10, 70)  # Randomize horizontal position within window
+        # Display round and step header
+        if current_round != round_num:
+            debate_placeholder.markdown(f"### Round {round_num}: {step}")
+            current_round = round_num
         
         # Generate HTML for the roundtable and speech bubble
         html_content = '<div class="roundtable">'
@@ -579,11 +583,11 @@ elif st.session_state.step == 4:
             active = "background-color: #ff6b6b;" if a == agent else ""
             html_content += f'<div class="agent" style="{active} left: {ax}%; top: {ay}%;">{a}</div>'
         html_content += '</div>'
-        html_content += f'<div class="speech-bubble" style="left: {bubble_x}%; top: {bubble_y}px;">{agent}: {message}</div>'
+        html_content += f'<div class="speech-bubble"><strong>{agent}:</strong><br>{message}</div>'
         
         with debate_placeholder.container():
             st.markdown(html_content, unsafe_allow_html=True)
-        time.sleep(0.3)  # Fast pacing for dynamic feel
+        time.sleep(1.0)  # Slower pacing for longer responses
     
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
