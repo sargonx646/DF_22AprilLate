@@ -67,7 +67,7 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
         current_step = process_steps[round_num]
         active_stakeholders = step_assignments[round_num] if step_assignments[round_num] else [p["name"] for p in personas]
 
-        # Generic prompt for the current round with CoT and collaboration
+        # Updated prompt for improved realism
         prompt = (
             "You are Grok-3-Beta, facilitating a human-like, constructive debate among stakeholders at a virtual roundtable. "
             "The debate must follow the decision-making process, with each round corresponding to a specific step. "
@@ -77,10 +77,10 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
             f"- Active Stakeholders: {', '.join(active_stakeholders)}\n"
             "Each active stakeholder should:\n"
             "- Contribute a 300–400 word response, deeply tied to the dilemma’s specifics and the current process step.\n"
-            "- Use Chain-of-Thought reasoning: Think step by step about your goals, biases, tone, bio (career history, motivations), and expected negotiation behavior before proposing a solution.\n"
+            "- Use Chain-of-Thought reasoning: Think step by step about your goals, biases, tone, bio, and expected negotiation behavior before proposing a solution.\n"
             "- Act proactively, proposing actionable solutions, anticipating challenges, and suggesting innovations.\n"
-            "- Build on the previous step’s outcomes (provided in the cumulative context), ensuring your contribution informs the next step.\n"
-            "- Engage constructively with other stakeholders’ previous arguments, referencing their points, proposing compromises, and resolving conflicts to advance the decision.\n"
+            "- **Explicitly reference and build on specific points from the cumulative context**, e.g., 'As [Stakeholder X] noted in Round 1 about [point], I propose...' or 'I disagree with [Stakeholder Y]'s earlier suggestion because...'.\n"
+            "- Engage constructively with other stakeholders’ previous arguments, proposing compromises and resolving conflicts.\n"
             "- Consider alternative scenarios or external factors, if provided, when making proposals.\n"
             f"Cumulative Context from Previous Rounds:\n{cumulative_context}\n"
             f"Stakeholder Profiles:\n{json.dumps(personas, indent=2)}\n"
