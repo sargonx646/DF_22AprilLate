@@ -7,7 +7,7 @@ from agents.persona_builder import build_personas
 from agents.debater import simulate_debate
 from agents.summarizer import summarize_and_analyze
 from utils.visualizer import generate_visuals
-from utils.db import init_db, save_simulation
+from utils.db import init_db, save_simulation, get_all_personas
 
 # Initialize database
 init_db()
@@ -128,17 +128,28 @@ if st.session_state.step == 1:
 # Step 2: Review Extracted Structure
 elif st.session_state.step == 2:
     st.header("Step 2: Review Decision Structure")
-    st.info("Examine the AI-identified stakeholders, issues, and process steps. Ready to create personas?")
+    st.info("Examine the AI-identified decision type, stakeholders, issues, and process steps, including ASCII visualizations.")
     if st.session_state.extracted:
-        st.json(st.session_state.extracted)
+        st.markdown("### Decision Type")
+        st.write(st.session_state.extracted.get("decision_type", "N/A"))
+        st.markdown("### Stakeholders")
+        st.json(st.session_state.extracted.get("stakeholders", []))
+        st.markdown("### Issues")
+        st.write(st.session_state.extracted.get("issues", []))
+        st.markdown("### Process Steps")
+        st.write(st.session_state.extracted.get("process", []))
+        st.markdown("### ASCII Process Timeline")
+        st.code(st.session_state.extracted.get("ascii_process", "No process visualization available."))
+        st.markdown("### ASCII Stakeholder Hierarchy")
+        st.code(st.session_state.extracted.get("ascii_stakeholders", "No stakeholder visualization available."))
         if st.button("Generate Personas", key="generate_personas"):
             try:
                 stakeholders = st.session_state.extracted.get("stakeholders", [])
-                if not stakeholders or len(stakeholders) < 3 or len(stakeholders) > 8:
-                    st.error("The simulation requires 3–8 stakeholders.")
+                if not stakeholders or len(stakeholders) < 3 or len(stakeholders) > 10:
+                    st.error("The simulation requires 3–10 stakeholders.")
                 else:
                     with st.spinner("Crafting stakeholder personas..."):
-                        st.session_state.personas = build_personas(stakeholders)
+                        st.session_state.personas = build_personas([s["name"] for s in stakeholders])
                     st.session_state.step = 3
                     st.success("Personas generated successfully!")
                     st.rerun()
@@ -150,7 +161,36 @@ elif st.session_state.step == 2:
 # Step 3: Review Personas
 elif st.session_state.step == 3:
     st.header("Step 3: Meet Your Stakeholders")
-    st.info("Discover the AI-crafted personas, each with unique goals, biases, and tones. Ready to see them debate?")
+    st.info("Discover and manage AI-crafted personas, or search previously saved personas.")
+    
+    # Persona Search and Navigation
+    st.markdown("### Search Saved Personas")
+    saved_personas = get_all_personas()
+    persona_names = [p["name"] for p in saved_personas]
+    search_query = st.text_input("Search for a persona by name:", "")
+    filtered_personas = [p for p in saved_personas if search_query.lower() in p["name"].lower()]
+    
+    if filtered_personas:
+        st.markdown("#### Matching Personas")
+        selected_persona = st.selectbox("Select a persona to view or edit:", [p["name"] for p in filtered_personas])
+        persona_data = next(p for p in filtered_personas if p["name"] == selected_persona)
+        with st.form(f"edit_persona_{selected_persona}"):
+            st.markdown("#### Edit Persona")
+            name = st.text_input("Name", value=persona_data["name"])
+            goals = st.text_area("Goals", value=", ".join(persona_data["goals"]))
+            biases = st.text_area("Biases", value=", ".join(persona_data["biases"]))
+            tone = st.text_input("Tone", value=persona_data["tone"])
+            if st.form_submit_button("Save Changes"):
+                updated_persona = {
+                    "name": name,
+                    "goals": goals.split(", "),
+                    "biases": biases.split(", "),
+                    "tone": tone
+                }
+                st.session_state.personas = [updated_persona if p["name"] == selected_persona else p for p in st.session_state.personas]
+                st.success(f"Persona {name} updated!")
+    
+    st.markdown("### Current Personas")
     cols = st.columns(3)
     for i, persona in enumerate(st.session_state.personas):
         with cols[i % 3]:
@@ -184,14 +224,13 @@ elif st.session_state.step == 4:
                 f'<div class="debate-message"><strong>{entry["agent"]}:</strong> {entry["message"]}</div>',
                 unsafe_allow_html=True
             )
-        time.sleep(0.5)  # Simulate live typing for immersive effect
+        time.sleep(0.5)
     st.markdown('</div>', unsafe_allow_html=True)
     if st.button("Analyze and Optimize", key="analyze"):
         try:
             with st.spinner("Analyzing debate and generating insights..."):
                 st.session_state.summary, st.session_state.keywords, st.session_state.suggestion = summarize_and_analyze(st.session_state.transcript)
                 generate_visuals(st.session_state.keywords, st.session_state.transcript)
-                # Save to database
                 save_simulation(
                     st.session_state.dilemma,
                     st.session_state.process_hint,
@@ -270,7 +309,6 @@ elif st.session_state.step == 5:
         except FileNotFoundError:
             st.warning("Heatmap unavailable.")
     
-    # Call to action
     st.markdown('''
     <div class="cta-box">
         <h3>Loved the Experience?</h3>
