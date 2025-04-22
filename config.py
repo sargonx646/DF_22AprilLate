@@ -22,7 +22,9 @@ STAKEHOLDER_ANALYSIS = {
         "analytical",
         "decisive",
         "cautious",
-        "impulsive"
+        "impulsive",
+        "innovative",
+        "pragmatic"
     ],
     "influences": [
         "regulatory bodies",
@@ -31,7 +33,9 @@ STAKEHOLDER_ANALYSIS = {
         "media",
         "competitors",
         "government policies",
-        "industry trends"
+        "industry trends",
+        "community stakeholders",
+        "environmental groups"
     ],
     "biases": [
         "confirmation bias",
@@ -39,7 +43,9 @@ STAKEHOLDER_ANALYSIS = {
         "groupthink",
         "status quo bias",
         "cost-avoidance bias",
-        "anchoring bias"
+        "anchoring bias",
+        "overconfidence bias",
+        "availability bias"
     ],
     "historical_behavior": [
         "prioritizes short-term gains",
@@ -47,7 +53,19 @@ STAKEHOLDER_ANALYSIS = {
         "consensus-driven",
         "unilateral decision-maker",
         "data-driven",
-        "resistant to change"
+        "resistant to change",
+        "proactive in innovation",
+        "reactive to crises"
+    ],
+    "tones": [
+        "diplomatic",
+        "assertive",
+        "empathetic",
+        "analytical",
+        "cautious",
+        "direct",
+        "persuasive",
+        "skeptical"
     ]
 }
 
