@@ -1,46 +1,112 @@
-import pandas as pd
-import seaborn as sns
+import wordcloud
 import matplotlib.pyplot as plt
-from wordcloud import WordCloud
+import seaborn as sns
+import pandas as pd
+import networkx as nx
+import plotly.graph_objects as go
 from typing import List, Dict
 
-def generate_visuals(keywords: List[str], transcript: List[Dict]) -> None:
+def generate_visuals(keywords: List[str], transcript: List[Dict]):
     """
-    Generate visualizations (word cloud and heatmap) from keywords and transcript.
+    Generate visualizations: a word cloud of key themes and a network graph of stakeholder interactions.
 
     Args:
-        keywords (List[str]): Keywords from summarization.
-        transcript (List[Dict]): Debate transcript with agent and message.
+        keywords (List[str]): List of extracted keywords.
+        transcript (List[Dict]): Debate transcript with agent, round, step, and message.
     """
-    # Word Cloud
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(" ".join(keywords))
+    # Generate Word Cloud
+    wordcloud_obj = wordcloud.WordCloud(width=800, height=400, background_color='white').generate(' '.join(keywords))
     plt.figure(figsize=(10, 5))
-    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.imshow(wordcloud_obj, interpolation='bilinear')
     plt.axis('off')
-    plt.savefig('visualization.png', bbox_inches='tight')
+    plt.savefig('visualization.png')
     plt.close()
 
-    # Heatmap: Analyze main topics per stakeholder
-    # Define topics based on extracted issues or keywords
-    topics = ["humanitarian", "security", "economic", "political"]  # Example topics
-    topic_counts = {agent: {topic: 0 for topic in topics} for agent in set(entry["agent"] for entry in transcript)}
-    
+    # Generate Network Graph of Stakeholder Interactions
+    G = nx.Graph()
+    stakeholders = list(set(entry["agent"] for entry in transcript))
+
+    # Add nodes (stakeholders)
+    for stakeholder in stakeholders:
+        G.add_node(stakeholder)
+
+    # Add edges based on mentions in the transcript
     for entry in transcript:
-        agent = entry["agent"]
+        speaker = entry["agent"]
         message = entry["message"].lower()
-        # Count topic mentions
-        for topic in topics:
-            if topic in message:
-                topic_counts[agent][topic] += message.count(topic)
-    
-    # Convert to DataFrame
-    df = pd.DataFrame.from_dict(topic_counts, orient='index')
-    
-    # Generate Heatmap
-    plt.figure(figsize=(10, 6))
-    sns.heatmap(df, annot=True, cmap="YlGnBu", fmt="d")
-    plt.title("Stakeholder Topic Focus Heatmap")
-    plt.xlabel("Topics")
-    plt.ylabel("Stakeholders")
-    plt.savefig('heatmap.png', bbox_inches='tight')
-    plt.close()
+        for other_stakeholder in stakeholders:
+            if other_stakeholder != speaker and other_stakeholder.lower() in message:
+                if G.has_edge(speaker, other_stakeholder):
+                    G[speaker][other_stakeholder]["weight"] += 1
+                else:
+                    G.add_edge(speaker, other_stakeholder, weight=1)
+
+    # Create positions for nodes using a spring layout
+    pos = nx.spring_layout(G)
+
+    # Extract edge weights for visualization
+    edge_x = []
+    edge_y = []
+    edge_weights = []
+    for edge in G.edges(data=True):
+        x0, y0 = pos[edge[0]]
+        x1, y1 = pos[edge[1]]
+        edge_x.extend([x0, x1, None])
+        edge_y.extend([y0, y1, None])
+        edge_weights.append(edge[2]["weight"])
+
+    # Create edge trace
+    edge_trace = go.Scatter(
+        x=edge_x,
+        y=edge_y,
+        line=dict(width=0.5, color='#888'),
+        hoverinfo='none',
+        mode='lines'
+    )
+
+    # Create node trace
+    node_x = [pos[node][0] for node in G.nodes()]
+    node_y = [pos[node][1] for node in G.nodes()]
+    node_trace = go.Scatter(
+        x=node_x,
+        y=node_y,
+        mode='markers+text',
+        text=list(G.nodes()),
+        textposition="top center",
+        hoverinfo='text',
+        marker=dict(
+            showscale=True,
+            colorscale='YlGnBu',
+            size=10,
+            colorbar=dict(
+                thickness=15,
+                title='Node Connections',
+                xanchor='left',
+                titleside='right'
+            )
+        )
+    )
+
+    # Color nodes by the number of connections
+    node_adjacencies = [len(list(G.neighbors(node))) for node in G.nodes()]
+    node_trace.marker.color = node_adjacencies
+
+    # Create the figure
+    fig = go.Figure(data=[edge_trace, node_trace],
+                    layout=go.Layout(
+                        title='Stakeholder Interaction Network',
+                        titlefont_size=16,
+                        showlegend=False,
+                        hovermode='closest',
+                        margin=dict(b=20, l=5, r=5, t=40),
+                        annotations=[dict(
+                            text="Interactions based on mentions in the debate",
+                            showarrow=False,
+                            xref="paper", yref="paper",
+                            x=0.005, y=-0.002)],
+                        xaxis=dict(showgrid=False, zeroline=False),
+                        yaxis=dict(showgrid=False, zeroline=False))
+                    )
+
+    # Save the figure as an HTML file
+    fig.write_html("network_graph.html")
