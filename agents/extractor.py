@@ -4,7 +4,7 @@ from openai import OpenAI
 from typing import Dict, List
 from config import STAKEHOLDER_ANALYSIS
 
-def extract_info(dilemma: str, process_hint: str, scenarios: str = "") -> Dict:
+def extract_decision_structure(dilemma: str, process_hint: str, scenarios: str = "") -> Dict:
     """
     Extract a decision structure from user inputs using xAI's Grok-3-Beta. Ensures reliable extraction of at least 4 stakeholders,
     key issues, and process steps, with detailed stakeholder attributes and fallbacks for minimal or vague inputs.
