@@ -1,11 +1,11 @@
 import streamlit as st
 import json
-from utils.extractor import extract_decision_structure
-from utils.personas import generate_personas
-from utils.debater import simulate_debate
-from utils.summarizer import generate_summary_and_suggestion
+from agents.extractor import extract_decision_structure
+from agents.persona_builder import generate_personas
+from agents.debater import simulate_debate
+from agents.summarizer import generate_summary_and_suggestion
 from utils.visualizer import generate_visuals
-from utils.database import save_persona, get_all_personas
+from utils.db import save_persona, get_all_personas
 
 # Initialize session state
 if "step" not in st.session_state:
