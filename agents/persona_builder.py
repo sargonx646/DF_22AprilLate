@@ -1,18 +1,15 @@
-from typing import List
+from typing import Dict, List
 import random
 import os
 from openai import OpenAI
 
-def build_personas(names: List[str], dilemma: str, process_hint: str, stakeholders: List[dict] = None) -> List[dict]:
+def generate_personas(extracted: Dict) -> List[dict]:
     """
     Build detailed personas for stakeholders, including AI-generated bios and expected negotiation behaviors,
-    based on the user-provided case details and extracted stakeholder data.
+    based on the extracted decision structure.
 
     Args:
-        names (List[str]): List of stakeholder names.
-        dilemma (str): The user-provided decision dilemma.
-        process_hint (str): The user-provided process and stakeholder details.
-        stakeholders (List[dict]): Extracted stakeholders with bio, traits, etc.
+        extracted (Dict): Extracted decision structure containing stakeholders, decision type, issues, process, etc.
 
     Returns:
         List[dict]: List of personas with name, goals, biases, tone, bio, and expected behavior.
@@ -21,6 +18,13 @@ def build_personas(names: List[str], dilemma: str, process_hint: str, stakeholde
         base_url="https://api.x.ai/v1",
         api_key=os.getenv("XAI_API_KEY")
     )
+
+    # Extract stakeholder information from the extracted dictionary
+    stakeholders = extracted.get("stakeholders", [])
+    if not stakeholders:
+        return []
+
+    names = [stakeholder["name"] for stakeholder in stakeholders]
 
     # Sample attributes for persona generation (as fallback if extraction fails)
     goals_options = [
@@ -42,7 +46,7 @@ def build_personas(names: List[str], dilemma: str, process_hint: str, stakeholde
     tones = ["diplomatic", "assertive", "empathetic", "analytical", "cautious"]
 
     # Map extracted stakeholders for reference
-    stakeholder_dict = {s["name"]: s for s in stakeholders} if stakeholders else {}
+    stakeholder_dict = {s["name"]: s for s in stakeholders}
 
     personas = []
     for name in names:
@@ -56,14 +60,24 @@ def build_personas(names: List[str], dilemma: str, process_hint: str, stakeholde
         initial_bio = extracted_data.get("bio", f"{name} has a long career in their field, with extensive experience relevant to the decision at hand.")
 
         # AI-generated Bio and Expected Behavior
+        # Construct context from the extracted dictionary
+        context = (
+            f"Decision Type: {extracted.get('decision_type', 'Unknown')}\n"
+            f"Issues: {', '.join(extracted.get('issues', ['Unknown']))}\n"
+            f"Process: {', '.join(extracted.get('process', ['Unknown']))}\n"
+            f"External Factors: {', '.join(extracted.get('external_factors', ['Unknown']))}\n"
+            f"Stakeholder Details: Name: {name}, Role: {extracted_data.get('role', 'Unknown')}, "
+            f"Traits: {extracted_data.get('psychological_traits', 'Unknown')}, "
+            f"Influences: {extracted_data.get('influences', 'Unknown')}\n"
+        )
+
         prompt = (
             f"Generate a detailed bio (150–200 words) and expected negotiation behavior (100–150 words) for a stakeholder named {name}. "
-            f"The stakeholder is part of a decision-making process described as follows:\n"
-            f"Dilemma: {dilemma}\n"
-            f"Process and Stakeholder Details: {process_hint}\n"
+            "The stakeholder is part of a decision-making process with the following context:\n"
+            f"{context}\n"
             f"Initial Bio (use as a starting point): {initial_bio}\n"
-            "Infer the stakeholder's role, priorities, career history, personality, and motivations from the provided dilemma and process details. "
-            "Incorporate any stakeholder dynamics or conflicts mentioned in the process hint. "
+            "Infer the stakeholder's role, priorities, career history, personality, and motivations from the provided context. "
+            "Incorporate any stakeholder dynamics or conflicts mentioned in the context. "
             "For the bio, detail their professional background, key achievements, and personal traits. "
             "For the expected behavior, describe how they’ll negotiate, considering their goals, biases, tone, and the case specifics (e.g., budget constraints, competing priorities). "
             "Return the result as plain text with the bio and behavior separated by '\n\n'."
