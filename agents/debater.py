@@ -2,6 +2,7 @@ import json
 import os
 import time
 from openai import OpenAI
+from openai import APITimeoutError  # Import specific timeout error
 from typing import List, Dict
 from config import DEBATE_ROUNDS, MAX_TOKENS, TIMEOUT_S
 
@@ -128,25 +129,22 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
             role = stakeholder_roles.get(stakeholder_name, "Team Member")
             focus_area = role_focus.get(role, "Focus on general contributions to the decision-making process.")
 
-            # Simplified prompt to avoid token limits
+            # Simplified prompt to reduce API processing time
             prompt = (
                 f"You are Grok-3-Beta, simulating {stakeholder_name}, with the role of {role}. "
-                f"Your expertise and focus area: {focus_area}\n"
+                f"Your expertise: {focus_area}\n"
                 "Your characteristics:\n"
                 f"- Goals: {', '.join(persona['goals'])}\n"
                 f"- Biases: {', '.join(persona['biases'])}\n"
                 f"- Tone: {persona['tone']}\n"
-                f"- Bio: {persona['bio'][:200]}\n"
-                f"- Expected Behavior: {persona['expected_behavior'][:100]}\n"
                 f"Current Step: {current_step} (Round {round_num + 1})\n"
                 f"Objective: {objective}\n"
                 "Instructions:\n"
                 "- Provide a 200–300 word response, focusing on the dilemma and current step, from your role’s perspective.\n"
-                "- Use Chain-of-Thought reasoning: Consider your goals, biases, tone, and expected behavior.\n"
-                "- Propose actionable solutions, anticipate challenges, and suggest innovations.\n"
-                "- Reference the cumulative context, e.g., 'As [Stakeholder X] noted...'\n"
-                "- Engage constructively, proposing compromises and resolving conflicts.\n"
-                f"Cumulative Context (summarized):\n{cumulative_context[-1000:]}\n"
+                "- Use Chain-of-Thought reasoning: Consider your goals, biases, and tone.\n"
+                "- Propose actionable solutions and address challenges.\n"
+                "- Reference the cumulative context briefly, e.g., 'As [Stakeholder X] noted...'\n"
+                f"Cumulative Context (summarized, last 500 chars):\n{cumulative_context[-500:]}\n"
                 "Return your response as a JSON object with keys 'agent', 'round', 'step', and 'message'."
             )
 
@@ -159,7 +157,7 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
                     ],
                     temperature=0.7,
                     max_tokens=800,
-                    timeout=10
+                    timeout=30  # Increased timeout to 30 seconds
                 )
                 raw_response = completion.choices[0].message.content
                 response = json.loads(raw_response)
@@ -167,9 +165,18 @@ def simulate_debate(personas: List[Dict], dilemma: str, process_hint: str, extra
                     round_transcript.append(response)
                 else:
                     raise ValueError("Invalid JSON structure")
+            except APITimeoutError as e:
+                print(f"Timeout Error for {stakeholder_name} (Round {round_num + 1}): {str(e)}")
+                # Append a minimal response and continue
+                round_transcript.append({
+                    "agent": stakeholder_name,
+                    "round": round_num + 1,
+                    "step": current_step,
+                    "message": f"As {stakeholder_name}, a {role}, I focus on {focus_area.lower()}. My goal is to {persona['goals'][0]}. In {current_step}, I would prioritize addressing the dilemma from my perspective, but the response timed out."
+                })
             except Exception as e:
                 print(f"Error for {stakeholder_name} (Round {round_num + 1}): {str(e)}")
-                raise  # Let the exception propagate to fail fast
+                raise  # Let other exceptions propagate to fail fast
 
         # Add round contributions to transcript and update cumulative context
         transcript.extend(round_transcript)
