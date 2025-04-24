@@ -1,15 +1,24 @@
 import streamlit as st
 import json
+import os
 from agents.extractor import extract_decision_structure
 from agents.persona_builder import generate_personas
 from agents.debater import simulate_debate
 from agents.summarizer import generate_summary_and_suggestion
 from utils.visualizer import generate_visuals
-from utils.db import save_persona, get_all_personas
+from utils.db import save_persona, get_all_personas, init_db
+
+# Initialize database
+init_db()
+
+# Check for XAI_API_KEY
+if not os.getenv("XAI_API_KEY"):
+    st.error("XAI_API_KEY environment variable is not set. Please configure it to use the app.")
+    st.stop()
 
 # Initialize session state
 if "step" not in st.session_state:
-    st.session_state.step = 0  # Start at Step 0 for password authentication
+    st.session_state.step = 0
 if "dilemma" not in st.session_state:
     st.session_state.dilemma = ""
 if "process_hint" not in st.session_state:
@@ -27,7 +36,7 @@ if "summary" not in st.session_state:
 if "suggestion" not in st.session_state:
     st.session_state.suggestion = ""
 
-# Custom CSS for styling
+# Custom CSS
 st.markdown("""
 <style>
     .main-title {
@@ -121,11 +130,14 @@ elif st.session_state.step == 1:
                 st.session_state.dilemma = dilemma
                 st.session_state.process_hint = process_hint
                 st.session_state.scenarios = scenarios
-                with st.spinner("Extracting decision structure..."):
-                    st.session_state.extracted = extract_decision_structure(dilemma, process_hint)
-                st.session_state.step = 2
-                st.success("Decision structure extracted successfully!")
-                st.rerun()
+                try:
+                    with st.spinner("Extracting decision structure..."):
+                        st.session_state.extracted = extract_decision_structure(dilemma, process_hint, scenarios)
+                    st.session_state.step = 2
+                    st.success("Decision structure extracted successfully!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to extract decision structure: {str(e)}")
 
 # Step 2: Extract Decision Structure
 elif st.session_state.step == 2:
@@ -144,11 +156,14 @@ elif st.session_state.step == 2:
     st.code(extracted_str, language="json")
     
     if st.button("Generate Personas"):
-        with st.spinner("Generating personas..."):
-            st.session_state.personas = generate_personas(st.session_state.extracted)
-        st.session_state.step = 3
-        st.success("Personas generated successfully!")
-        st.rerun()
+        try:
+            with st.spinner("Generating personas..."):
+                st.session_state.personas = generate_personas(st.session_state.extracted)
+            st.session_state.step = 3
+            st.success("Personas generated successfully!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Failed to generate personas: {str(e)}")
     
     if st.button("Back to Step 1"):
         st.session_state.step = 1
@@ -188,7 +203,8 @@ elif st.session_state.step == 3:
                     "expected_behavior": expected_behavior
                 }
                 st.session_state.personas = [updated_persona if p["name"] == selected_persona else p for p in st.session_state.personas]
-                st.success(f"Persona {name} updated!")
+                save_persona(updated_persona)
+                st.success(f"Persona {name} updated and saved to database!")
     
     st.markdown("### Current Personas")
     stakeholder_titles = {}
@@ -221,7 +237,7 @@ elif st.session_state.step == 3:
         "Set Maximum Simulation Time (minutes):",
         min_value=1,
         max_value=5,
-        value=2,
+        value=3,  # Increased default to 3 minutes
         step=1,
         help="Choose how long the simulation can run before it times out. A shorter time may result in an incomplete transcript."
     )
@@ -259,16 +275,20 @@ elif st.session_state.step == 4:
         st.write(entry['message'])
         st.markdown("---")
     
-    with st.spinner("Generating summary, suggestions, and visualizations..."):
-        summary, suggestion = generate_summary_and_suggestion(st.session_state.transcript)
-        st.session_state.summary = summary
-        st.session_state.suggestion = suggestion
-        keywords = [word for entry in st.session_state.transcript for word in entry['message'].split() if len(word) > 5]
-        generate_visuals(keywords, st.session_state.transcript)
-    
-    st.session_state.step = 5
-    st.success("Summary and visualizations generated!")
-    st.rerun()
+    try:
+        with st.spinner("Generating summary, suggestions, and visualizations..."):
+            summary, suggestion = generate_summary_and_suggestion(st.session_state.transcript)
+            st.session_state.summary = summary
+            st.session_state.suggestion = suggestion
+            keywords = [word for entry in st.session_state.transcript for word in entry['message'].split() if len(word) > 5]
+            generate_visuals(keywords, st.session_state.transcript)
+        st.session_state.step = 5
+        st.success("Summary and visualizations generated!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Failed to generate summary or visualizations: {str(e)}")
+        st.session_state.step = 5
+        st.rerun()
 
 # Step 5: View Results
 elif st.session_state.step == 5:
