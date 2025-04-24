@@ -1,10 +1,16 @@
 import streamlit as st
 import json
 import os
+import pkg_resources
 from agents.extractor import extract_decision_structure
 from agents.persona_builder import generate_personas
 from agents.debater import simulate_debate
-from agents.agent_iq_debater import simulate_debate_agent_iq
+try:
+    from agents.agent_iq_debater import simulate_debate_agent_iq
+    agentiq_available = True
+except ImportError:
+    agentiq_available = False
+    simulate_debate_agent_iq = None
 from agents.summarizer import generate_summary_and_suggestion
 from utils.visualizer import generate_visuals
 from utils.db import save_persona, get_all_personas, init_db
@@ -12,14 +18,18 @@ from utils.db import save_persona, get_all_personas, init_db
 # Initialize database
 init_db()
 
+# Log installed packages for debugging
+installed_packages = [f"{p.key}=={p.version}" for p in pkg_resources.working_set]
+st.write("Debug: Installed packages:", installed_packages)
+
 # Check for API keys
 if not os.getenv("XAI_API_KEY"):
     st.error("XAI_API_KEY environment variable is not set. Please configure it to use the Grok-3-Beta simulation.")
     st.stop()
-if not os.getenv("NVIDIA_API_KEY"):
+if not os.getenv("NVIDIA_API_KEY") and agentiq_available:
     st.error("NVIDIA_API_KEY environment variable is not set. Please configure it to use the AgentIQ simulation.")
     st.stop()
-if not os.getenv("TAVILY_API_KEY"):
+if not os.getenv("TAVILY_API_KEY") and agentiq_available:
     st.warning("TAVILY_API_KEY is not set. AgentIQ simulation may have limited functionality.")
 
 # Initialize session state
@@ -239,10 +249,15 @@ elif st.session_state.step == 3:
             ''', unsafe_allow_html=True)
 
     st.markdown("### Simulation Settings")
+    simulation_options = ["Grok-3-Beta"]
+    if agentiq_available:
+        simulation_options.append("AgentIQ")
+    else:
+        st.warning("AgentIQ simulation is unavailable because the 'agentiq' package is not installed. Please install 'agentiq==1.0.0' from NVIDIA's repository (build.nvidia.com) or contact NVIDIA support.")
     simulation_type = st.selectbox(
         "Select Simulation Type:",
-        ["Grok-3-Beta", "AgentIQ"],
-        help="Choose between the default Grok-3-Beta simulation or the AgentIQ-based simulation."
+        simulation_options,
+        help="Choose the simulation type. AgentIQ requires the 'agentiq' package and NVIDIA_API_KEY."
     )
     simulation_time_minutes = st.slider(
         "Set Maximum Simulation Time (minutes):",
@@ -266,7 +281,7 @@ elif st.session_state.step == 3:
                         scenarios=st.session_state.scenarios,
                         max_simulation_time=simulation_time_seconds
                     )
-                else:  # AgentIQ
+                elif simulation_type == "AgentIQ" and agentiq_available:
                     st.session_state.transcript = simulate_debate_agent_iq(
                         personas=st.session_state.personas,
                         dilemma=st.session_state.dilemma,
@@ -275,6 +290,9 @@ elif st.session_state.step == 3:
                         scenarios=st.session_state.scenarios,
                         max_simulation_time=simulation_time_seconds
                     )
+                else:
+                    st.error("AgentIQ simulation is not available. Please select Grok-3-Beta.")
+                    st.stop()
             st.session_state.step = 4
             st.success("Simulation complete! Watch the debate unfold.")
             st.rerun()
