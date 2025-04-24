@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import pkg_resources
+import random
 from agents.extractor import extract_decision_structure
 from agents.persona_builder import generate_personas
 from agents.debater import simulate_debate
@@ -13,7 +14,7 @@ except ImportError:
     simulate_debate_agent_iq = None
 from agents.summarizer import generate_summary_and_suggestion
 from utils.visualizer import generate_visuals
-from utils.db import save_persona, get_all_personas, init_db
+from utils.db import save_persona, get_all_personas, init_db, update_persona, delete_persona
 
 # Initialize database
 init_db()
@@ -51,6 +52,21 @@ if "summary" not in st.session_state:
     st.session_state.summary = ""
 if "suggestion" not in st.session_state:
     st.session_state.suggestion = ""
+
+# Sidebar with logo, progress bar, and navigation
+st.sidebar.image("https://github.com/sargonx646/DF_22AprilLate/raw/main/assets/decisionforge_logo.png.png", use_column_width=True)
+st.sidebar.markdown("<h2 style='text-align: center;'>DecisionTwin</h2>", unsafe_allow_html=True)
+progress = st.session_state.step / 5
+st.sidebar.progress(progress)
+st.sidebar.markdown(f"**Step {st.session_state.step} of 5**")
+if st.session_state.step > 0:
+    if st.sidebar.button("Back"):
+        st.session_state.step = max(0, st.session_state.step - 1)
+        st.rerun()
+if st.session_state.step < 5:
+    if st.sidebar.button("Forward"):
+        st.session_state.step = min(5, st.session_state.step + 1)
+        st.rerun()
 
 # Custom CSS
 st.markdown("""
@@ -104,12 +120,54 @@ st.markdown("""
     .cta-box button:hover {
         background-color: #45a049;
     }
+    .mock-button {
+        background-color: #ff0000;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .mock-button:hover {
+        background-color: #cc0000;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# Mock decision dilemma generator
+def generate_mock_dilemma():
+    scenarios = [
+        {
+            "type": "Government",
+            "dilemma": "Should the city allocate its annual budget surplus to improve public transportation or to fund affordable housing initiatives?",
+            "process_hint": "1. Budget Committee reviews options over 2 months. 2. Public consultation in month 3. 3. City Council votes in month 4.\nStakeholders:\n- Sarah: Budget Committee Chair\n- James: Public Transit Advocate\n- Maria: Housing Authority Director\n- Tom: City Council Member",
+            "scenarios": "Potential budget cuts from state funding or increased construction costs could impact either initiative."
+        },
+        {
+            "type": "Foreign Policy",
+            "dilemma": "Should the country increase diplomatic efforts or impose economic sanctions to address a neighboring nation's aggressive border policies?",
+            "process_hint": "1. Foreign Ministry assesses situation (1 month). 2. Interagency meeting with Defense and Trade (2 weeks). 3. Cabinet decision (1 month).\nStakeholders:\n- Emma: Foreign Minister\n- General Lee: Defense Advisor\n- Clara: Trade Secretary\n- Ambassador Patel: Regional Expert",
+            "scenarios": "Escalation of border tensions or international pressure from allies could influence the decision."
+        },
+        {
+            "type": "Corporate",
+            "dilemma": "Should the company invest in a new AI-driven product line or focus on expanding its existing market share in traditional products?",
+            "process_hint": "1. R&D team evaluates feasibility (3 months). 2. Marketing assesses market demand (1 month). 3. Board decides (2 weeks).\nStakeholders:\n- Alex: CEO\n- Rachel: R&D Director\n- Sam: Marketing VP\n- Lisa: CFO",
+            "scenarios": "Competitor launches a similar AI product, or economic downturn reduces consumer spending."
+        },
+        {
+            "type": "HR Dispute",
+            "dilemma": "Should the company implement a mandatory return-to-office policy or maintain a hybrid work model to resolve employee dissatisfaction?",
+            "process_hint": "1. HR conducts employee surveys (1 month). 2. Management reviews feedback (2 weeks). 3. Policy decision by executives (1 week).\nStakeholders:\n- Olivia: HR Director\n- Mark: Operations Manager\n- Sophia: Employee Representative\n- David: CEO",
+            "scenarios": "New health regulations or a competitor’s fully remote policy could impact employee retention."
+        }
+    ]
+    return random.choice(scenarios)
 
 # Step 0: Password Authentication
 if st.session_state.step == 0:
     st.markdown("<h1 class='main-title'>DecisionTwin for Decision Making</h1>", unsafe_allow_html=True)
+    st.image("https://github.com/sargonx646/DF_22AprilLate/raw/main/assets/decisionforge_logo.png.png", use_column_width=True)
     st.markdown("### Please Enter the Password to Access the App")
     
     password_input = st.text_input("Password", type="password")
@@ -130,15 +188,38 @@ elif st.session_state.step == 1:
     
     with st.form("decision_form"):
         st.markdown("### Decision Dilemma")
-        dilemma = st.text_area("What decision are you trying to make? Be specific about the problem or dilemma.", height=100)
+        dilemma = st.text_area("What decision are you trying to make? Be specific about the problem or dilemma.", height=100, value=st.session_state.dilemma)
         
         st.markdown("### Decision-Making Process and Stakeholders")
-        process_hint = st.text_area("Describe the decision-making process, timeline, and stakeholders involved. Optionally, include their roles or titles.", height=150)
+        process_hint = st.text_area("Describe the decision-making process, timeline, and stakeholders involved. Optionally, include their roles or titles.", height=150, value=st.session_state.process_hint)
         
         st.markdown("### Alternative Scenarios or External Factors (Optional)")
-        scenarios = st.text_area("Describe any alternative scenarios or external factors that might impact the decision (e.g., budget cuts, political changes).", height=100)
+        scenarios = st.text_area("Describe any alternative scenarios or external factors that might impact the decision (e.g., budget cuts, political changes).", height=100, value=st.session_state.scenarios)
         
-        submitted = st.form_submit_button("Extract Decision Structure")
+        col1, col2 = st.columns(2)
+        with col1:
+            submitted = st.form_submit_button("Extract Decision Structure")
+        with col2:
+            if st.form_submit_button("Generate a Mock Decision Dilemma", key="mock_dilemma", help="Generate a random decision scenario"):
+                mock = generate_mock_dilemma()
+                st.session_state.dilemma = mock["dilemma"]
+                st.session_state.process_hint = mock["process_hint"]
+                st.session_state.scenarios = mock["scenarios"]
+                st.rerun()
+        
+        # Load personas from database
+        st.markdown("### Load Stakeholders from Database")
+        saved_personas = get_all_personas()
+        if saved_personas:
+            selected_personas = st.multiselect("Select personas to include in process:", [p["name"] for p in saved_personas])
+            if st.button("Add Selected Personas to Process"):
+                current_process = st.session_state.process_hint
+                new_stakeholders = "\n".join([f"- {p['name']}: {p['bio'][:50]}..." for p in saved_personas if p["name"] in selected_personas])
+                st.session_state.process_hint = f"{current_process}\n\nSelected Stakeholders:\n{new_stakeholders}" if current_process else new_stakeholders
+                st.rerun()
+        else:
+            st.write("No personas in database.")
+
         if submitted:
             if not dilemma or not process_hint:
                 st.error("Please provide both the decision dilemma and the decision-making process/stakeholders.")
@@ -175,8 +256,11 @@ elif st.session_state.step == 2:
         try:
             with st.spinner("Generating personas..."):
                 st.session_state.personas = generate_personas(st.session_state.extracted)
+                # Save generated personas to database
+                for persona in st.session_state.personas:
+                    save_persona(persona)
             st.session_state.step = 3
-            st.success("Personas generated successfully!")
+            st.success("Personas generated and saved successfully!")
             st.rerun()
         except Exception as e:
             st.error(f"Failed to generate personas: {str(e)}")
@@ -191,6 +275,44 @@ elif st.session_state.step == 3:
     st.header("Step 3: Meet Your Stakeholders")
     st.info("Review and modify the AI-crafted personas, or search previously saved personas.")
     
+    # Database of Personas
+    st.markdown("### Database of Personas")
+    if st.button("View/Edit Personas Database"):
+        saved_personas = get_all_personas()
+        if saved_personas:
+            st.markdown("#### Saved Personas")
+            for persona in saved_personas:
+                with st.expander(f"{persona['name']} (ID: {persona['id']})"):
+                    with st.form(f"edit_db_persona_{persona['id']}"):
+                        name = st.text_input("Name", value=persona["name"])
+                        goals = st.text_area("Goals", value=", ".join(persona["goals"]))
+                        biases = st.text_area("Biases", value=", ".join(persona["biases"]))
+                        tone = st.text_input("Tone", value=persona["tone"])
+                        bio = st.text_area("Bio", value=persona["bio"], height=150)
+                        expected_behavior = st.text_area("Expected Behavior", value=persona["expected_behavior"], height=100)
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("Update Persona"):
+                                updated_persona = {
+                                    "id": persona["id"],
+                                    "name": name,
+                                    "goals": goals.split(", "),
+                                    "biases": biases.split(", "),
+                                    "tone": tone,
+                                    "bio": bio,
+                                    "expected_behavior": expected_behavior
+                                }
+                                update_persona(updated_persona)
+                                st.success(f"Persona {name} updated in database!")
+                                st.rerun()
+                        with col2:
+                            if st.form_submit_button("Delete Persona"):
+                                delete_persona(persona["id"])
+                                st.success(f"Persona {name} deleted from database!")
+                                st.rerun()
+        else:
+            st.write("No personas in database.")
+
     st.markdown("### Search Saved Personas")
     saved_personas = get_all_personas()
     persona_names = [p["name"] for p in saved_personas]
@@ -211,6 +333,7 @@ elif st.session_state.step == 3:
             expected_behavior = st.text_area("Expected Behavior", value=persona_data["expected_behavior"], height=100)
             if st.form_submit_button("Save Changes"):
                 updated_persona = {
+                    "id": persona_data["id"],
                     "name": name,
                     "goals": goals.split(", "),
                     "biases": biases.split(", "),
@@ -218,9 +341,10 @@ elif st.session_state.step == 3:
                     "bio": bio,
                     "expected_behavior": expected_behavior
                 }
+                update_persona(updated_persona)
                 st.session_state.personas = [updated_persona if p["name"] == selected_persona else p for p in st.session_state.personas]
-                save_persona(updated_persona)
                 st.success(f"Persona {name} updated and saved to database!")
+                st.rerun()
     
     st.markdown("### Current Personas")
     stakeholder_titles = {}
@@ -298,10 +422,6 @@ elif st.session_state.step == 3:
             st.rerun()
         except Exception as e:
             st.error(f"Simulation failed: {str(e)}")
-    
-    if st.button("Back to Step 2"):
-        st.session_state.step = 2
-        st.rerun()
 
 # Step 4: Watch the Debate Unfold
 elif st.session_state.step == 4:
