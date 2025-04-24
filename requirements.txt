@@ -13,4 +13,10 @@ networkx>=3.3
 plotly>=5.24.1
 textblob==0.18.0.post0 
 gensim==4.3.2
-agentiq[langchain]>=1.0
+
+agentiq==1.0.0 
+langchain==0.2.16 
+langchain-community==0.2.15 
+langchain-core==0.2.38 faiss-cpu==1.8.0
+
+
