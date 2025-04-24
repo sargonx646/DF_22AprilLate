@@ -4,6 +4,7 @@ import os
 from agents.extractor import extract_decision_structure
 from agents.persona_builder import generate_personas
 from agents.debater import simulate_debate
+from agents.agent_iq_debater import simulate_debate_agent_iq
 from agents.summarizer import generate_summary_and_suggestion
 from utils.visualizer import generate_visuals
 from utils.db import save_persona, get_all_personas, init_db
@@ -11,10 +12,15 @@ from utils.db import save_persona, get_all_personas, init_db
 # Initialize database
 init_db()
 
-# Check for XAI_API_KEY
+# Check for API keys
 if not os.getenv("XAI_API_KEY"):
-    st.error("XAI_API_KEY environment variable is not set. Please configure it to use the app.")
+    st.error("XAI_API_KEY environment variable is not set. Please configure it to use the Grok-3-Beta simulation.")
     st.stop()
+if not os.getenv("NVIDIA_API_KEY"):
+    st.error("NVIDIA_API_KEY environment variable is not set. Please configure it to use the AgentIQ simulation.")
+    st.stop()
+if not os.getenv("TAVILY_API_KEY"):
+    st.warning("TAVILY_API_KEY is not set. AgentIQ simulation may have limited functionality.")
 
 # Initialize session state
 if "step" not in st.session_state:
@@ -233,27 +239,42 @@ elif st.session_state.step == 3:
             ''', unsafe_allow_html=True)
 
     st.markdown("### Simulation Settings")
+    simulation_type = st.selectbox(
+        "Select Simulation Type:",
+        ["Grok-3-Beta", "AgentIQ"],
+        help="Choose between the default Grok-3-Beta simulation or the AgentIQ-based simulation."
+    )
     simulation_time_minutes = st.slider(
         "Set Maximum Simulation Time (minutes):",
         min_value=1,
         max_value=5,
-        value=3,  # Increased default to 3 minutes
+        value=3,
         step=1,
-        help="Choose how long the simulation can run before it times out. A shorter time may result in an incomplete transcript."
+        help="Choose how long the simulation can run before it times out."
     )
     simulation_time_seconds = simulation_time_minutes * 60
 
     if st.button("Launch Simulation", key="launch_simulation"):
         try:
-            with st.spinner(f"Initiating simulation (will timeout after {simulation_time_minutes} minute{'s' if simulation_time_minutes != 1 else ''})..."):
-                st.session_state.transcript = simulate_debate(
-                    personas=st.session_state.personas,
-                    dilemma=st.session_state.dilemma,
-                    process_hint=st.session_state.process_hint,
-                    extracted=st.session_state.extracted,
-                    scenarios=st.session_state.scenarios,
-                    max_simulation_time=simulation_time_seconds
-                )
+            with st.spinner(f"Initiating {simulation_type} simulation (will timeout after {simulation_time_minutes} minute{'s' if simulation_time_minutes != 1 else ''})..."):
+                if simulation_type == "Grok-3-Beta":
+                    st.session_state.transcript = simulate_debate(
+                        personas=st.session_state.personas,
+                        dilemma=st.session_state.dilemma,
+                        process_hint=st.session_state.process_hint,
+                        extracted=st.session_state.extracted,
+                        scenarios=st.session_state.scenarios,
+                        max_simulation_time=simulation_time_seconds
+                    )
+                else:  # AgentIQ
+                    st.session_state.transcript = simulate_debate_agent_iq(
+                        personas=st.session_state.personas,
+                        dilemma=st.session_state.dilemma,
+                        process_hint=st.session_state.process_hint,
+                        extracted=st.session_state.extracted,
+                        scenarios=st.session_state.scenarios,
+                        max_simulation_time=simulation_time_seconds
+                    )
             st.session_state.step = 4
             st.success("Simulation complete! Watch the debate unfold.")
             st.rerun()
@@ -302,14 +323,12 @@ elif st.session_state.step == 5:
     st.markdown(f'<div class="suggestion-box">{st.session_state.suggestion}</div>', unsafe_allow_html=True)
     
     st.markdown("### Visual Insights")
-    # Word Cloud
     st.subheader("Word Cloud of Key Themes")
     try:
         st.image("word_cloud.png", use_column_width=True)
     except FileNotFoundError:
         st.warning("Word cloud unavailable.")
 
-    # Network Graph
     st.subheader("Stakeholder Interaction Network")
     try:
         with open("network_graph.html", "r") as f:
@@ -318,7 +337,6 @@ elif st.session_state.step == 5:
     except FileNotFoundError:
         st.warning("Network graph unavailable.")
 
-    # Timeline Chart
     st.subheader("Stakeholder Priorities Over Rounds")
     try:
         with open("timeline_chart.html", "r") as f:
@@ -327,7 +345,6 @@ elif st.session_state.step == 5:
     except FileNotFoundError:
         st.warning("Timeline chart unavailable.")
 
-    # Sentiment Analysis
     st.subheader("Sentiment Analysis of Contributions")
     try:
         with open("sentiment_chart.html", "r") as f:
@@ -336,7 +353,6 @@ elif st.session_state.step == 5:
     except FileNotFoundError:
         st.warning("Sentiment chart unavailable.")
 
-    # Topic Modeling
     st.subheader("Top Terms in Identified Topics")
     try:
         with open("topic_modeling_chart.html", "r") as f:
