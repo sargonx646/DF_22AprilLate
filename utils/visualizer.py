@@ -16,17 +16,24 @@ except ImportError:
 from typing import List, Dict
 import numpy as np
 import pandas as pd
+import os
 
 def generate_visuals(keywords: List[str], transcript: List[Dict]):
     """
-    Generate visualizations for the debate transcript: a word cloud of key themes, an enhanced network graph of stakeholder interactions,
-    a timeline chart of stakeholder priorities, a sentiment analysis plot, and a topic modeling bar chart.
+    Generate visualizations for the debate transcript.
 
     Args:
         keywords (List[str]): List of extracted keywords.
         transcript (List[Dict]): Debate transcript with agent, round, step, and message.
     """
-    # 1. Generate Word Cloud
+    # Create placeholder files to prevent FileNotFoundError
+    placeholder_html = "<p>Visualization unavailable.</p>"
+    for filename in ["network_graph.html", "timeline_chart.html", "sentiment_chart.html", "topic_modeling_chart.html"]:
+        if not os.path.exists(filename):
+            with open(filename, "w") as f:
+                f.write(placeholder_html)
+
+    # 1. Word Cloud
     try:
         wordcloud_obj = wordcloud.WordCloud(width=800, height=400, background_color='white', max_words=15).generate(' '.join(keywords))
         plt.figure(figsize=(10, 5))
@@ -36,26 +43,20 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
         plt.close()
     except Exception as e:
         print(f"Word Cloud Generation Error: {str(e)}")
+        with open('word_cloud.png', 'w') as f:
+            f.write('')  # Create empty placeholder
 
-    # 2. Enhanced Network Graph of Stakeholder Interactions
+    # 2. Network Graph
     try:
         G = nx.Graph()
         stakeholders = list(set(entry["agent"] for entry in transcript))
-
-        # Add nodes (stakeholders) with roles
         stakeholder_roles = {}
         for entry in transcript:
             agent = entry["agent"]
             if agent not in stakeholder_roles:
-                # Extract role from the message if available
-                if "role of" in entry["message"]:
-                    role = entry["message"].split("role of")[1].split(".")[0].strip()
-                    stakeholder_roles[agent] = role
-                else:
-                    stakeholder_roles[agent] = "Unknown"
+                stakeholder_roles[agent] = "Unknown"
             G.add_node(agent, role=stakeholder_roles[agent])
 
-        # Add edges based on mentions in the transcript
         for entry in transcript:
             speaker = entry["agent"]
             message = entry["message"].lower()
@@ -66,10 +67,7 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
                     else:
                         G.add_edge(speaker, other_stakeholder, weight=1)
 
-        # Create positions for nodes using a spring layout
         pos = nx.spring_layout(G)
-
-        # Extract edge coordinates and weights for visualization
         edge_x = []
         edge_y = []
         edge_weights = []
@@ -78,9 +76,8 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
             x1, y1 = pos[edge[1]]
             edge_x.extend([x0, x1, None])
             edge_y.extend([y0, y1, None])
-            edge_weights.extend([edge[2]["weight"] * 2] * 2 + [None])  # Scale weights for visibility
+            edge_weights.extend([edge[2]["weight"] * 2] * 2 + [None])
 
-        # Create edge trace with weights
         edge_trace = go.Scatter(
             x=edge_x,
             y=edge_y,
@@ -89,13 +86,11 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
             mode='lines'
         )
 
-        # Create node trace with role-based colors
         node_x = [pos[node][0] for node in G.nodes()]
         node_y = [pos[node][1] for node in G.nodes()]
         node_roles = [G.nodes[node]["role"] for node in G.nodes()]
         role_colors = px.colors.qualitative.Plotly[:len(set(node_roles))]
-        role_to_color = {role: role_colors[i % len(role_colors)] for i, role in enumerate(set(node_roles))}
-        node_colors = [role_to_color[role] for role in node_roles]
+        node_colors = [role_colors[i % len(role_colors)] for i in range(len(node_roles))]
 
         node_trace = go.Scatter(
             x=node_x,
@@ -104,26 +99,14 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
             text=list(G.nodes()),
             textposition="top center",
             hoverinfo='text',
-            marker=dict(
-                size=15,
-                color=node_colors,
-                line=dict(width=2, color='#000')
-            )
+            marker=dict(size=15, color=node_colors, line=dict(width=2))
         )
 
-        # Create the network graph figure
         fig = go.Figure(data=[edge_trace, node_trace],
                         layout=go.Layout(
                             title='Stakeholder Interaction Network',
-                            titlefont_size=16,
                             showlegend=False,
-                            hovermode='closest',
                             margin=dict(b=20, l=5, r=5, t=40),
-                            annotations=[dict(
-                                text="Edge thickness reflects mention frequency",
-                                showarrow=False,
-                                xref="paper", yref="paper",
-                                x=0.005, y=-0.002)],
                             xaxis=dict(showgrid=False, zeroline=False),
                             yaxis=dict(showgrid=False, zeroline=False))
                         )
@@ -131,9 +114,8 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
     except Exception as e:
         print(f"Network Graph Generation Error: {str(e)}")
 
-    # 3. Timeline Chart of Stakeholder Priorities
+    # 3. Timeline Chart
     try:
-        # Extract priorities mentioned in messages (simplified keyword matching)
         priorities = []
         for entry in transcript:
             message = entry["message"].lower()
@@ -167,13 +149,13 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
     except Exception as e:
         print(f"Timeline Chart Generation Error: {str(e)}")
 
-    # 4. Sentiment Analysis Plot
+    # 4. Sentiment Analysis
     if TextBlob:
         try:
             sentiments = []
             for entry in transcript:
                 blob = TextBlob(entry["message"])
-                sentiment = blob.sentiment.polarity  # Range: -1 (negative) to 1 (positive)
+                sentiment = blob.sentiment.polarity
                 sentiments.append({
                     "Agent": entry["agent"],
                     "Round": entry["round"],
@@ -186,24 +168,21 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
                 x="Round",
                 y="Agent",
                 color="Sentiment",
-                title="Sentiment Analysis of Stakeholder Contributions",
+                title="Sentiment Analysis",
                 color_discrete_map={"Positive": "green", "Neutral": "gray", "Negative": "red"}
             )
             fig.write_html("sentiment_chart.html", include_plotlyjs='cdn')
         except Exception as e:
             print(f"Sentiment Analysis Chart Generation Error: {str(e)}")
     else:
-        print("TextBlob not available. Skipping sentiment analysis chart.")
+        print("TextBlob not available.")
 
-    # 5. Topic Modeling Bar Chart
+    # 5. Topic Modeling
     if corpora and LdaModel:
         try:
-            # Prepare text data for topic modeling
             texts = [entry["message"].lower().split() for entry in transcript]
             dictionary = corpora.Dictionary(texts)
             corpus = [dictionary.doc2bow(text) for text in texts]
-
-            # Train LDA model
             lda_model = LdaModel(corpus, num_topics=3, id2word=dictionary, passes=10)
             topics = lda_model.print_topics(num_words=5)
             topic_data = []
@@ -223,11 +202,11 @@ def generate_visuals(keywords: List[str], transcript: List[Dict]):
                 x="Weight",
                 y="Term",
                 color="Topic",
-                title="Top Terms in Identified Topics",
+                title="Top Terms in Topics",
                 orientation='h'
             )
             fig.write_html("topic_modeling_chart.html", include_plotlyjs='cdn')
         except Exception as e:
             print(f"Topic Modeling Chart Generation Error: {str(e)}")
     else:
-        print("Gensim not available. Skipping topic modeling chart.")
+        print("Gensim not available.")
