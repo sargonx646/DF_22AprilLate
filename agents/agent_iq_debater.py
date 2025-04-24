@@ -1,10 +1,19 @@
 import json
 import os
 import time
+import logging
 from typing import List, Dict
-from agentiq import AIQRunner
 from config import DEBATE_ROUNDS
 from tenacity import retry, stop_after_attempt, wait_fixed
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+try:
+    from agentiq import AIQRunner
+except ImportError:
+    AIQRunner = None
+    logger.error("Failed to import 'agentiq'. Ensure 'agentiq==1.0.0' is installed from NVIDIA's repository (build.nvidia.com).")
 
 def simulate_debate_agent_iq(personas: List[Dict], dilemma: str, process_hint: str, extracted: Dict, scenarios: str = "", rounds: int = DEBATE_ROUNDS, max_simulation_time: int = 180) -> List[Dict]:
     """
@@ -22,6 +31,20 @@ def simulate_debate_agent_iq(personas: List[Dict], dilemma: str, process_hint: s
     Returns:
         List[Dict]: Debate transcript with agent, round, step, and message.
     """
+    if AIQRunner is None:
+        error_msg = (
+            "AgentIQ simulation failed: 'agentiq' package is not installed. "
+            "Please install 'agentiq==1.0.0' from NVIDIA's repository (visit build.nvidia.com for access) "
+            "or contact NVIDIA support. Ensure 'rich==13.9.0' is installed to avoid conflicts."
+        )
+        logger.error(error_msg)
+        return [{
+            "agent": "System",
+            "round": 1,
+            "step": "Error",
+            "message": error_msg
+        }]
+
     transcript = []
     process_steps = extracted.get("process", [])
     if len(process_steps) < rounds:
@@ -39,14 +62,33 @@ def simulate_debate_agent_iq(personas: List[Dict], dilemma: str, process_hint: s
                 stakeholder_roles[name] = role
     filtered_personas = [p for p in personas if "USAID" not in stakeholder_roles.get(p["name"], "")]
 
-    # Save personas to a temporary JSON file for process manager
-    personas_file = "personas.json"
-    with open(personas_file, "w") as f:
-        json.dump(filtered_personas, f, indent=2)
+    # Save personas to a temporary JSON file in /tmp for Streamlit Cloud compatibility
+    personas_file = "/tmp/personas.json"
+    try:
+        with open(personas_file, "w") as f:
+            json.dump(filtered_personas, f, indent=2)
+    except Exception as e:
+        transcript.append({
+            "agent": "System",
+            "round": 1,
+            "step": "Error",
+            "message": f"Failed to write personas file: {str(e)}"
+        })
+        return transcript
 
     # Initialize AgentIQ runner
     config_file = "agents/agent_iq_config.yml"
-    runner = AIQRunner(config_file=config_file)
+    try:
+        runner = AIQRunner(config_file=config_file)
+    except Exception as e:
+        transcript.append({
+            "agent": "System",
+            "round": 1,
+            "step": "Error",
+            "message": f"Failed to initialize AgentIQ runner: {str(e)}"
+        })
+        os.remove(personas_file) if os.path.exists(personas_file) else None
+        return transcript
 
     # Define process objectives
     process_objectives = {
