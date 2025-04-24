@@ -186,6 +186,14 @@ elif st.session_state.step == 1:
     st.header("Step 1: Define Your Decision")
     st.info("Provide details about your decision dilemma, decision-making process, stakeholders, and any alternative scenarios.")
     
+    # Mock dilemma button outside the form
+    if st.button("Generate a Mock Decision Dilemma", key="mock_dilemma", help="Generate a random decision scenario"):
+        mock = generate_mock_dilemma()
+        st.session_state.dilemma = mock["dilemma"]
+        st.session_state.process_hint = mock["process_hint"]
+        st.session_state.scenarios = mock["scenarios"]
+        st.rerun()
+
     with st.form("decision_form"):
         st.markdown("### Decision Dilemma")
         dilemma = st.text_area("What decision are you trying to make? Be specific about the problem or dilemma.", height=100, value=st.session_state.dilemma)
@@ -196,16 +204,7 @@ elif st.session_state.step == 1:
         st.markdown("### Alternative Scenarios or External Factors (Optional)")
         scenarios = st.text_area("Describe any alternative scenarios or external factors that might impact the decision (e.g., budget cuts, political changes).", height=100, value=st.session_state.scenarios)
         
-        col1, col2 = st.columns(2)
-        with col1:
-            submitted = st.form_submit_button("Extract Decision Structure")
-        with col2:
-            if st.form_submit_button("Generate a Mock Decision Dilemma", key="mock_dilemma", help="Generate a random decision scenario"):
-                mock = generate_mock_dilemma()
-                st.session_state.dilemma = mock["dilemma"]
-                st.session_state.process_hint = mock["process_hint"]
-                st.session_state.scenarios = mock["scenarios"]
-                st.rerun()
+        submitted = st.form_submit_button("Extract Decision Structure")
         
         # Load personas from database
         st.markdown("### Load Stakeholders from Database")
